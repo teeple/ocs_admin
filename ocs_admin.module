@@ -1,0 +1,621 @@
+<?php
+
+module_load_include( 'inc', 'ocs_admin', 'ocs_common');
+module_load_include( 'inc', 'ocs_admin', 'ocs_campaign');
+
+/**
+* Implement hook_help().
+*/
+function ocs_admin_help($path, $arg) 
+{
+    if ($path == 'admin/help#ocs_admin') {
+        return t('<em>OCS Admin</em> allows to configure UANGEL Online Charging System.');
+    }
+}
+
+/***
+* Implementation of hook_menu
+*/
+function ocs_admin_menu() {
+    // for admin
+    $items['admin/config/system/ocs_admin'] = array(
+        'title' => 'Configure Online Charging System',
+        'description' => 'Configure system parameters of UANGEL OCS',
+        'page callback' => 'drupal_get_form',
+        'page arguments' => array('ocs_admin_config'),
+        'access arguments' => array('administer users'),
+        'type' => MENU_NORMAL_ITEM,
+        'file' => 'ocs_admin.admin.inc',
+    );
+
+    // for testing menu
+    $items['helloworld'] = array(
+        'title' => 'Hello World',
+        'page callback' => 'drupal_get_form',
+        'page arguments' => array( 'ocs_account_add_form'),
+        'access arguments' => array('access content'),
+    );
+
+    $items['helloworld/%ctools_js/form'] = array(
+        'title' => 'AJAX World',
+        'page callback' => 'ocs_admin_modal',
+        'page arguments' => array(1),
+        'access arguments' => array('access content'),
+        'type' => MENU_CALLBACK,
+    );
+
+    // menu items for event
+    /*
+    $items['ocs_admin/config/ocs/import'] = array(
+        'title callback' => 'ocs_admin_import_title',
+        'title arguments' => array('OCS'),
+        'page callback' => 'drupal_get_form',
+        'page arguments' => array('ocs_admin_import_ocs_config'),
+        'access arguments' => array('access content'),
+        'file' => 'ocs_import.inc',
+    );
+
+    // edit event
+    $items['ocs_admin/config/ocs/event/%/export'] = array(
+        'title' => 'Export Event to Other Client',
+        'page callback' => 'drupal_get_form',
+        'page arguments' => array('ocs_admin_event_export', 4),
+        'access arguments' => array('access content'),
+        'file' => 'ocs_import.inc',
+    );
+    */
+
+    // menu items for account management 
+    /*
+    $items['ocs_admin/account/add'] = array(
+        'title' => 'Add New Account',
+        'page callback' => 'ocs_admin_account_add_page',
+        'access arguments' => array('access content'),
+        'file' => 'ocs_account.inc',
+    );
+
+    $items['ocs_admin/account/add/%/%ctools_js/%/%/%'] = array(
+        'title' => 'Callback for adding a new account',
+        'page callback' => 'ocs_account_select',
+        'page arguments' => array( 3, 4, 5, 6, 7),     // nojs/type/id/name i.e. customer/1/tom
+        'access arguments' => array('access content'),
+        'type' => MENU_CALLBACK,
+    );
+    */
+
+    $items['ocs_admin/account/%/delete'] = array(
+        'title' => 'Delete the Account',
+        'page callback' => 'drupal_get_form',
+        'page arguments' => array( 'ocs_admin_account_delete_confirm', 2),
+        'access arguments' => array('access content'),
+        'file' => 'ocs_account.inc',
+    );
+
+    $items['ocs_admin/account/%/edit'] = array(
+        'title' => 'Edit the Account Information',
+        'page callback' => 'drupal_get_form',
+        'page arguments' => array( 'ocs_admin_account_edit_form', 2),
+        'access arguments' => array('access content'),
+        'file' => 'ocs_account.inc',
+    );
+
+    // menu items for group management
+
+    $items['ocs_admin/group/%group/delete'] = array(
+        'title callback' => 'ocs_admin_group_title',
+        'title arguments' => array('Delete', 2),
+        'page callback' => 'drupal_get_form',
+        'page arguments' => array( 'ocs_admin_group_delete_confirm', 2),
+        'access arguments' => array('access content'),
+        'file' => 'ocs_group.inc',
+    );
+
+    /*
+    $items['ocs_admin/group/%group/member/%/edit'] = array(
+        'title' => 'Edit Member',
+        'page callback' => 'drupal_get_form',
+        'page arguments' => array( 'ocs_admin_member_edit_form', 2, 4),
+        'access arguments' => array('access content'),
+        'type' => MENU_LOCAL_TASK,
+        'context' => MENU_CONTEXT_PAGE | MENU_CONTEXT_INLINE,
+        'file' => 'ocs_group.inc',
+    );
+
+    $items['ocs_admin/group/%group/member/%/delete'] = array(
+        'title' => 'Delete a Member',
+        'page callback' => 'drupal_get_form',
+        'page arguments' => array( 'ocs_admin_member_delete_confirm', 2, 4),
+        'access arguments' => array('access content'),
+        'file' => 'ocs_group.inc',
+    );
+    */
+
+    // MAX_MENU_PATH is 9
+    /*
+    $items['ocs_admin/group/%group/member/add/%ctools_js/%/%/%'] = array(
+        'title' => 'Callback for adding a new member',
+        'page callback' => 'ocs_member_select',
+        'page arguments' => array( 2, 5, 6, 7, 8),     // nojs/type/id/name i.e. customer/1/tom
+        'access arguments' => array('access content'),
+        'type' => MENU_CALLBACK,
+        'file' => 'ocs_group.inc',
+    );
+    */
+
+    $items['ocs_admin/group/%/member/add/%ctools_js'] = array(
+        'title' => 'Callback for adding a new member',
+        'page callback' => 'ocs_member_select',
+        'page arguments' => array( 2, 5),     // nojs/type/id/name i.e. customer/1/tom
+        'access arguments' => array('access content'),
+        'type' => MENU_CALLBACK,
+        'file' => 'ocs_group.inc',
+    );
+
+
+/*
+    $items['ocs_admin/card/product/card/%'] = array(
+        'title' => 'Connect product and card type',
+        'page callback' => 'ocs_admin_product_card_add',
+        'page arguments' => array(4),
+        'access arguments' => array('access content'),
+    );
+
+     $items['ocs_admin/product/card/%/%ctools_js/product/%/%'] = array(
+        'title' => 'Callback for adding a new product card type',
+        'page callback' => 'ocs_product_select',
+        'page arguments' => array( 3, 4, 'product', 6, 7),     // nojs/type/id/name i.e. customer/1/tom
+        'access arguments' => array('access content'),
+        'type' => MENU_CALLBACK,
+    );
+
+   $items['ocs_admin/product/card/%/%ctools_js/cardtype/%/%'] = array(
+        'title' => 'Callback for adding a new product card type',
+        'page callback' => 'ocs_cardtype_select',
+        'page arguments' => array( 3, 4, 'card', 6, 7),     // nojs/type/id/name i.e. customer/1/tom
+        'access arguments' => array('access content'),
+        'type' => MENU_CALLBACK,
+    );
+
+
+    $items['ocs_admin/card/product/%/add'] = array(
+        'title' => 'Related Product',
+        'page callback' => 'drupal_get_form',
+        'page arguments' => array( 'ocs_admin_product_card_form', 'add', 3),
+        'access arguments' => array('access content'),
+        'file' => 'ocs_card.inc',
+    );
+
+
+    // menu items for add cardtype management
+    $items['ocs_admin/card/cardtype/add'] = array(
+        'title' => 'Add Card Type',
+        'page callback' => 'drupal_get_form',
+        'page arguments' => array( 'ocs_admin_card_form', 'add', 3),
+        'access arguments' => array('access content'),
+        'file' => 'ocs_card.inc',
+    );
+
+    // menu items for edit cardtype management
+    $items['ocs_admin/card/cardtype/%cardtype/edit'] = array(
+        'title' => 'Edit Card Type',
+        'page callback' => 'drupal_get_form',
+        'page arguments' => array( 'ocs_admin_card_form', 'edit', 3),
+        'access arguments' => array('access content'),
+        'file' => 'ocs_card.inc',
+    );
+*/
+    // menu items for campaign management
+
+	/*
+    $items['ocs_admin/campaign'] = array(
+        'title' => 'Campaign List',
+        'page callback' => 'ocs_admin_campaign_overview',
+        'access arguments' => array('access content'),
+        'file' => 'ocs_campaign.inc',
+    );
+
+    $items['ocs_admin/campaign/%/rule'] = array(
+        'title' => 'Campaign Rules',
+        'page callback' => 'ocs_admin_campaign_rule_page',
+        'page arguments' => array( 2),
+        'access arguments' => array('access content'),
+        'file' => 'ocs_campaign.inc',
+    );
+
+    $items['ocs_admin/campaign/%/rule/event'] = array(
+        'title' => 'Add a New Event for the Campaign',
+        'page callback' => 'drupal_get_form',
+        'page arguments' => array( 'ocs_admin_campaign_event_form', 2),
+        'access arguments' => array('access content'),
+        'file' => 'ocs_campaign.inc',
+    );
+	*/
+
+    // menu items for counter management
+    $items['ocs_admin/account/%/counter/%/%/edit'] = array(
+        'title' => 'Edit Counter',
+        'page callback' => 'drupal_get_form',
+        'page arguments' => array( 'ocs_admin_counter_edit_form', 2, 4, 5),
+        'access arguments' => array('access content'),
+        'file' => 'ocs_counter.inc',
+    );
+
+    $items['ocs_admin/account/%/counter/add'] = array(
+        'title' => 'Edit Counter',
+        'page callback' => 'drupal_get_form',
+        'page arguments' => array( 'ocs_admin_counter_add_form', 2),
+        'access arguments' => array('access content'),
+        'file' => 'ocs_counter.inc',
+    );
+
+    // menu items for state transition
+
+    /*
+    $items['ocs_admin/config/ocs/export/transition'] = array(
+        'title' => 'Export State Transition Rules',
+        'page callback' => 'drupal_get_form',
+        'page arguments' => array( 'ocs_admin_export_state_transition'),
+        'access arguments' => array('access content'),
+        'file' => 'ocs_export.inc',
+    );
+
+    $items['ocs_admin/config/ocs/export/svcperm'] = array(
+        'title' => 'Export Service Permissions of each State',
+        'page callback' => 'drupal_get_form',
+        'page arguments' => array( 'ocs_admin_export_state_svc_perm'),
+        'access arguments' => array('access content'),
+        'file' => 'ocs_export.inc',
+    );
+    */
+
+    // menu items for customer selection
+    $items['ocs_admin/customer/select/%ctools_js/%/%/%'] = array(
+        'title' => 'Callback for selecting a customer',
+        'page callback' => 'ocs_customer_select',
+        'page arguments' => array( 3, 4, 5, 6),     // nojs/type/id/name i.e. customer/1/tom
+        'access arguments' => array('access content'),
+        'type' => MENU_CALLBACK,
+        'file' => 'ocs_customer.inc',
+    );
+
+    // menu items for ajax callback
+    $items['ocs_admin/campaign/%/rule/%ctools_js/%/%'] = array(
+        'title' => 'Callback for adding AND or OR condition',
+        'page callback' => 'ocs_admin_campaign_condition_add',
+        'page arguments' => array( 2, 4, 5, 6),     // nojs/AND/add, nojs/id/delete
+        'access arguments' => array('access content'),
+        'type' => MENU_CALLBACK,
+        'file' => 'ocs_campaign.inc',
+    );
+
+
+    return $items;
+}
+
+/*
+** implement hook_theme()
+*/
+function ocs_admin_theme()
+{
+    return array(
+        'ocs_admin_group_form' => array(
+            'file' => 'ocs_group.inc',
+            'render element' => 'form',
+        ),
+        'ocs_admin_member_list' => array(
+            'file' => 'ocs_group.inc',
+            'render element' => 'form',
+//            'variables' => array( 'title' => NULL, 'name' => NULL, 'description' => NULL),
+        ),
+        'ocs_admin_group_overview' => array(
+            'file' => 'ocs_group.inc',
+            'variables' => array( 'title' => NULL, 'name' => NULL, 'description' => NULL),
+        ),
+        'ocs_admin_campaign_rule_form' => array(
+            'file' => 'ocs_campaign.inc',
+            'render element' => 'form',
+        ),
+    );
+}
+
+
+/*
+* Menu callback to say hello to the world
+*/
+function helloworld() {
+    /*
+    db_set_active('ocsdb');    // activation & execution same as explained above
+
+    $result = db_select( 'ocs_customer')
+        ->fields( 'ocs_customer', array( 'customer_id', 'customer_name'))
+        ->execute();
+
+    $output = "";
+    while($record = $result->fetchAssoc()) {
+        $output = $output.print_r($record, TRUE);
+    }
+
+    db_set_active('default'); // set back to original
+
+    return $output;
+    */
+    ctools_include('ajax'); // Module  include the dependence it needs for ajax.
+    ctools_include('modal');
+    ctools_modal_add_js();
+
+    $block['account'] = module_invoke( 'views', 'block_view', 'ocs_account-block2');
+    $block['product'] = module_invoke( 'views', 'block_view', 'ocs_product-block');
+
+    $form = drupal_get_form( 'ocs_account_add_form');
+    $output = drupal_render( $form);
+
+    return array(
+        /*
+        'first form' => array( 
+            '#type' => 'markup',
+            '#markup' => $output,
+            '#prefix' => '<div id="ocs_account_add_form">',
+            '#suffix' => '</div>',
+            '#post_render' => array( 'ocs_account_add_form_post_render'),
+            ),
+        'kpr form' => array( 
+            '#markup' => kpr( $table, TRUE),
+            ),
+        'kpr output' => array( 
+            '#markup' => kpr( $output, TRUE),
+            ),
+            */
+        'account' => $block['account']['content'],
+        'kpr account' => array( 
+            '#markup' => kpr( $block['account']['content'], TRUE),
+            ),
+            /*
+        'product' => $block['product']['content'],
+        */
+    );
+}
+
+/*
+** tried to implement modal popup to select customer or product
+*/
+function ocs_admin_modal( $js = NULL)
+{
+    if ( $js) {
+        ctools_include('ajax');
+        ctools_include('modal');
+    }
+
+    $block = module_invoke( 'views', 'block_view', 'ocs_account-block');
+
+    $form = ocs_admin_modal_submit_form( 'ocs_admin_modal_submit_form');
+    $render = array(
+        'title' => array(
+            '#type' => 'markup',
+            '#markup' => '<h2>Select Customer</h2>',
+        ),
+
+        'view' => $block['content'],
+
+        'form' => $form,
+    );
+
+    if ( $js) {
+        $command = array();
+        $command = ctools_modal_form_render( $form_state, $render);
+        print ajax_render( $command);
+        exit;
+    }
+    else {
+        return $render;
+    }
+}
+
+function ocs_admin_modal_submit_form()
+{
+    /*
+    $form['form_var'] = array(
+        '#type' => 'markup',
+        '#markup' => 'form',
+        '#prefix' => '<div id="ocs_admin_modal_submit_form">',
+        '#suffix' => '</div>',
+        );
+    */
+
+    $form['submit'] = array(
+        '#type' => 'button',
+        '#value' => 'Submit',
+    );
+
+    return $form;
+}
+
+/*
+* Enable views to load this module
+*/
+function ocs_admin_views_api() {
+      return array('api' => 3.0);
+}
+
+/*
+function ocs_admin_taxonomy_term_insert($term) {
+  if (!empty($term->synonyms)) {
+    foreach (explode("\n", str_replace("\r", '', $term->synonyms)) as $synonym) {
+      if ($synonym) {
+        db_insert('taxonomy_term_synonym')
+        ->fields(array(
+          'tid' => $term->tid, 
+          'name' => rtrim($synonym),
+        ))
+        ->execute();
+      }
+    }
+  }
+}
+
+function ocs_admin_taxonomy_term_load($terms) {
+  $result = db_query('SELECT tid, name FROM taxonomy_term_synonym ');
+  foreach ($result as $record) {
+    $terms[$record->tid]->foo = $record->foo;
+  }
+}
+*/
+
+/*
+    add card type
+*/
+function ocs_admin_card_form_save( $cardtype)
+{
+	
+  db_set_active( 'ocsdb');
+  $card_type = strtoupper($cardtype['card_type']);
+
+  $fields = array( 
+      'card_type' =>  isset($card_type) ?  $card_type : NULL,
+      'unit' => isset($cardtype['unit']) ? $cardtype['unit'] : NULL,
+      'active_period' => isset($cardtype['active_period']) ? $cardtype['active_period'] : NULL,
+      'grace_period' => isset($cardtype['grace_period']) ? $cardtype['grace_period'] : NULL,
+      'description' => isset($cardtype['description']) ? $cardtype['description'] : NULL,
+      );
+
+  if ( isset( $cardtype['card_type'])) {
+      $status = db_merge( 'ocs_card_type')
+          ->key( array( 'card_type' => $cardtype['card_type']))
+          ->fields( $fields)
+          ->execute();
+      dpm( $status, 'db_merge result');
+  }
+  else {
+      // insert
+      $options = array('return' => Database::RETURN_INSERT_ID);
+      $last_insert_id = db_insert( 'ocs_card_type', $options)
+          ->fields( $fields)
+          ->execute();
+      dpm( $last_insert_id, 'db_insert result');
+  }
+
+  db_set_active( 'default');
+  return 1;
+}
+   
+/*    
+    Parameter Check
+*/
+function chk_param_rule($obj, $rule)
+{
+	$chk = 1;
+	$obj = trim($obj);
+	
+	if($obj){
+		//English
+		if('en' == $rule){
+			if(preg_match("/[a-zA-Z]/", $obj)) $chk = 0;
+		}
+
+		//Number
+		if('int' == $rule){
+			if(preg_match("/[0-9]/", $obj)) $chk = 0;
+		}
+
+		// Special
+		if('special' == $rule){
+			if(preg_match("/[!#$%^&*()?+=\/]/", $obj)) $chk = 0;
+		}
+
+		return $chk;
+	}
+}
+/*
+    load product info
+*/
+function ocs_admin_product_load( $product_id)
+{
+   db_set_active('ocsdb');
+
+   $query = db_select( 'ocs_product', 'g');
+   $result = $query->fields( 'g')
+        ->condition( 'product_serial_no', $product_id, '=')
+        ->execute() 
+        ->fetchAssoc();
+//    dpm( $result, 'fetched product');
+
+    db_set_active('default');
+
+    return $result;
+}
+
+/**
+* Implementation of hook_form_alter().
+*/
+function ocs_admin_form_alter(&$form, &$form_state, $form_id) 
+{
+
+    if($form_id == 'ocs_state_machine_node_form') {
+//        dpm( $form, 'form');
+        unset( $form['revision_information']);
+        unset( $form['additional_settings']);
+        unset( $form['author']);
+        unset( $form['options']);
+        unset( $form['comment_settings']);
+    }
+}
+
+
+/*
+load card type
+*/
+function cardtype_load( $cardtype )
+{
+    db_set_active('ocsdb');
+
+    $query = db_select( 'ocs_card_type', 'a');
+    $result = $query->fields( 'a')
+                    ->condition( 'card_type', $cardtype, '=')
+                    ->execute()
+                    ->fetchAssoc();
+   
+//    dpm( $result, 'fetched card type');
+    db_set_active('default');
+
+    return $result;
+}
+
+
+
+/********************
+Utility functions
+*********************/
+/*
+
+*/
+function ocs_admin_get_term( $type, $value)
+{
+    $term_list = ocs_admin_get_term_list( $type);
+    if ( isset( $term_list))
+        return $term_list[$value];
+
+    return NULL;
+}
+
+function ocs_admin_get_term_list( $type)
+{
+    $select = &drupal_static(__FUNCTION__, array());
+    if ( !isset($select[$type])) {
+        $var = variable_get( 'ocs_admin_' . $type);
+        if ( ! isset( $var)) return NULL;
+
+//        dpm( $var, $type);
+        $list = preg_split( '/[\n]/', $var);
+ //       dpm( $list, 'list');
+
+        foreach( $list as $item) {
+            $token = explode( '|', $item);
+            $select[$type][ $token[0]] = $token[1];
+        }
+
+//        dpm( $select, 'select '.$type);
+    }
+
+    return $select[$type];
+ }
+
+

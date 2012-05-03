@@ -1,0 +1,8 @@
+name = OCS Admin
+description = "OCS Admin Module"
+core = 7.x
+version = 7.0
+package = OCS Admin
+files[] = ocs_admin.test
+stylesheets[all][] = ocs_admin.css
+//ocs_admin.module
