@@ -1036,7 +1036,7 @@ function ocs_admin_member_list( $form, &$form_state, $groupid)
     );
 
     foreach( $members as $key => $member) {
-//        dpm( $member, 'member');
+        dpm( $member, 'member');
 
         $sub = &$form['#subgroup'][ $member['group_id']];
         $sub['members'][] = $key;
