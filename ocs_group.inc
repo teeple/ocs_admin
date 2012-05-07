@@ -1052,7 +1052,7 @@ if (substr($groupid, 0, 1) == 'A'){
     );
 
     foreach( $members as $key => $member) {
-//        dpm( $member, 'member');
+        dpm( $member, 'member');
 
         $sub = &$form['#subgroup'][ $member['group_id']];
         $sub['members'][] = $key;
