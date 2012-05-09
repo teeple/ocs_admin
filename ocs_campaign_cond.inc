@@ -197,7 +197,7 @@ function _campaign_operator( $paramlist, $selected)
 	dpm( $selected, 'selected');
 	$oplist = array(
 		OCS_PARAM_TYPE_STRING => array(
-			'string', 'contains', 'equal to', 'not equal to'
+			'=', '>', '>=', '<', '<=', 'starts', 'in list', 'between',
 			),
 		OCS_PARAM_TYPE_INTEGER => array(
 			'integer', 'equal to', 'not equal to', 'greater than', 'less than'
@@ -466,9 +466,28 @@ function ocs_admin_campaign_rule_delete( $rule_id)
 {
     db_set_active('ocsdb');
 
-	$result = db_delete( 'ocs_campaign_rules')
-		->condition( 'rule_id', $rule_id, '=')
-		->execute();
+    $txn = db_transaction();
+
+    try {
+        // delete rules
+        $result = db_delete( 'ocs_campaign_rules')
+            ->condition( 'rule_id', $rule_id, '=')
+            ->execute();
+
+        // delete conditions
+        $result = db_delete( 'ocs_campaign_conditions')
+            ->condition( 'rule_id', $rule_id, '=')
+            ->execute();
+
+        // delete actions
+        $result = db_delete( 'ocs_campaign_actions')
+            ->condition( 'rule_id', $rule_id, '=')
+            ->execute();
+    }
+    catch( Exception $e) {
+        $txn->rollback();
+        watchdog_exception( 'type', $e);
+    }
 
     db_set_active( 'default');
 

@@ -496,9 +496,9 @@ function theme_ocs_admin_campaign_rule_form($variables)
 function ocs_admin_campaign_rule_theme( $form)
 {
     $header = array(
-        t('Name'),
-        array( 'data' => t('Item'), 'colspan' => '2'),
-        t('Conditions & Actions'),
+        t('Rules'),
+        array( 'data' => t('Conditions & Actions'), 'colspan' => '2'),
+        array( 'data' => t('Description')),
         array( 'data' => t('Operations'), 'colspan' => '3'),
     );
 
