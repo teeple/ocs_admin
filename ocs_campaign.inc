@@ -115,15 +115,13 @@ function ocs_admin_campaign_rule_form( $form, &$form_state, $campaign_id = NULL)
 
             $operations['add'] = array( 
                 '#type' => 'link',
-                '#title' => t('Add Rule'),
-                '#href' => t( 'ocs_admin/campaign/@campaign/event/@event/rule/nojs/add', $t_arg),
-                '#options' => array( 'html' => TRUE, 
-                    'attributes' => array( 'class' => array( 'use-ajax'))),
+                '#title' => t('Add'),
+                '#href' => t( 'ocs_admin/campaign/@campaign/event/add', $t_arg),
             );
 
             $operations['delete'] = array( 
               '#type' => 'link',
-              '#title' => t('Delete Event'),
+              '#title' => t('Delete'),
               '#href' => t( 'ocs_admin/campaign/@campaign/event/@event/delete', $t_arg),
               '#options' => $q_arg,
               );
@@ -134,8 +132,16 @@ function ocs_admin_campaign_rule_form( $form, &$form_state, $campaign_id = NULL)
         // add rules
 		// Build a list of operations for rules
 		$operations = array();
-		$t_arg = array( '@campaign' => $rule['campaign_id'], '@rule_id' => $rule_id);
+		$t_arg = array( '@campaign' => $rule['campaign_id'], '@rule_id' => $rule_id, '@event' => $rule['event_id']);
 
+        $operations['add'] = array( 
+            '#type' => 'link',
+            '#title' => t('Add'),
+            '#href' => t( 'ocs_admin/campaign/@campaign/event/@event/rule/nojs/add', $t_arg),
+            '#options' => array( 'html' => TRUE, 
+                'attributes' => array( 'class' => array( 'use-ajax'))),
+        );
+        
 		$operations['delete'] = array( 
 		    '#type' => 'link',
 		    '#title' => t('Delete'),
@@ -149,6 +155,28 @@ function ocs_admin_campaign_rule_form( $form, &$form_state, $campaign_id = NULL)
         // add conditions
         $form['#rule'][$rule_id]['#no_cond'] = 0;
         if ( isset( $conditions[$rule_id])) {
+            $t_arg = array( '@campaign' => $rule['campaign_id'], '@rule' => $rule_id);
+            $q_arg = array( 'query' => array( 'event_name' => $form['#event'][$event_id]['#event_name']));
+
+            // add operations for 'Conditions(OR)'
+            $operations = array();
+            $operations['add'] = array( 
+                '#type' => 'link',
+                '#title' => t('Add OR'),
+                '#href' => t( 'ocs_admin/campaign/@campaign/rule/@rule/cond/0/add', $t_arg),
+                '#options' => $q_arg,
+            );
+
+            $operations['delete'] = array( 
+                '#type' => 'link',
+                '#title' => t('Delete OR'),
+                '#href' => t( 'ocs_admin/campaign/@campaign/rule/@rule/cond/0/delete', $t_arg),
+                '#options' => $q_arg,
+            );
+
+            $form['#rule'][$rule_id]['operations'] = $operations;
+
+
             foreach( $conditions[$rule_id] as $cond) {
                 $info = array(
                     '#type' => 'item',
@@ -156,11 +184,11 @@ function ocs_admin_campaign_rule_form( $form, &$form_state, $campaign_id = NULL)
                 );
 
                 $cond_id = $cond['cond_id'];
-                $operations = array();
-                $t_arg = array( '@campaign' => $rule['campaign_id'], '@rule' => $rule_id, '@cond' => $cond_id);
-                $q_arg = array( 'query' => array( 'event_name' => $form['#event'][$event_id]['#event_name'],
-                    'name' => $cond['cond_name'], 'idx' => $cond['cond_idx']));
+                $t_arg['@cond'] = $cond_id;
+                $q_arg['query']['name'] = $cond['cond_name'];
+                $q_arg['query']['idx'] = $cond['cond_idx'];
 
+                $operations = array();
                 $operations['add'] = array( 
                     '#type' => 'link',
                     '#title' => t('Add AND'),
@@ -171,7 +199,7 @@ function ocs_admin_campaign_rule_form( $form, &$form_state, $campaign_id = NULL)
                 $operations['delete'] = array( 
                     '#type' => 'link',
                     '#title' => t('Delete'),
-                    '#href' => t( 'ocs_admin/campaign/@campaign/cond/@cond/delete', $t_arg),
+                    '#href' => t( 'ocs_admin/campaign/@campaign/rule/@rule/cond/@cond/delete', $t_arg),
                     '#options' => $q_arg,
                 );
 
@@ -188,6 +216,7 @@ function ocs_admin_campaign_rule_form( $form, &$form_state, $campaign_id = NULL)
                 );
             }
             $form['#rule'][$rule_id]['#no_cond'] = count( $conditions[$rule_id]);
+
         }
 
         // add actions
@@ -497,7 +526,7 @@ function ocs_admin_campaign_rule_theme( $form)
 {
     $header = array(
         t('Rules'),
-        array( 'data' => t('Conditions & Actions'), 'colspan' => '2'),
+        array( 'data' => t('Items'), ),
         array( 'data' => t('Description')),
         array( 'data' => t('Operations'), 'colspan' => '3'),
     );
@@ -517,26 +546,21 @@ function ocs_admin_campaign_rule_theme( $form)
 		  // Add special classes to be used for tabledrag.js.
 		  $element['weight']['#attributes']['class'] = array('menu-weight');
 
-		  $event = array();
-		  $event[] = array( 'data' => $element['description'], 'colspan' => '4', 'class' => array('description'));
-
-//		  $event[] = drupal_render($element['weight']);
-		  $event = array_merge( $event, $operations);
-
-		  $event = array_merge(array('data' => $event), $element['#attributes']);
-		  $event['class'][] = 'draggable';
-		  $rows[] = $event;
+		  $row = array();
+		  $row[] = array( 'data' => $element['description'], 'colspan' => '3', 
+            'class' => array('description', 'bd-top'));
+		  $row = array_merge( $row, $operations);
+		  $rows[] = $row;
 
 		  // list conditions and actions of each rule
           foreach( $form['#event'][$event_id]['rule'] as $rule_id => $rule) {
               $no_cond = $form['#rule'][$rule_id]['#no_cond'];
               $no_action = count( $form['#rule'][$rule_id]['action']);
 
-              $operations = theme_action_list( $rule['operations']);
-
-              $rule_section = array( 'data' => t('Rule %id', array( '%id' => $rule_id)) . $operations, 
-                'rowspan' => max( 1, $no_cond) + max( 1, $no_action),
-                'class' => array( 'bd-btm'));
+              $row = array();
+              $row[] = array( 'data' => t('Rule ').$rule_id, 'colspan' => '3', 'class' => array( 'bd-top'));
+              $row = array_merge( $row, _operation_list( $rule['operations']));
+              $rows[] = $row;
 
               // get conditions
               $idx = 0;
@@ -544,23 +568,21 @@ function ocs_admin_campaign_rule_theme( $form)
               foreach( $form['#rule'][$rule_id]['cond'] as $conds) {
                   $and_idx =0;
                   foreach( $conds as $cond) {
-                      $operations = array();
-                      foreach( element_children( $cond['operations']) as $op) {
-                          $operations[] = array( 'data' => drupal_render($cond['operations'][$op]),
-                            'class' => array('menu-operations'));
+                      if ( $idx ++ == 0) {
+                          $row = array(
+                                array(),
+                                array( 'data' => 'Conditions (OR)', 'colspan' => '2', ));
+                          $row = array_merge( $row, _operation_list( $form['#rule'][$rule_id]['operations']));
+                          $rows[] = $row;
                       }
 
-                      $row = array();
-                      if ( $idx ++ == 0) {
-                          $row[] = $rule_section;
-                          $row[] = array( 'data' => 'Conditions <br>(OR)', 'rowspan' => max( 1, $no_cond),
-                            'class' => array('bd-btm')); 
-                      }
+                      $row = array( array());
                       if ( $and_idx ++ == 0) {
-                          $row[] = array( 'data' => 'AND', 'rowspan' => count( $conds), 'class' => array('bd-btm'));
+                          $row[] = array( 'data' => _indentation(1) . 'AND', 'rowspan' => count( $conds));
                       }
-                      $row[] = array( 'data' => $cond['info'], 'class' => ($and_idx == count($conds)) ? array( 'bd-btm') : array());
-                      $row = array_merge( $row, $operations);
+                      $row[] = array( 'data' => $cond['info'], 
+                        'class' => ($and_idx == count($conds)) ? array( 'bd-btm', 'dotted') : array());
+                      $row = array_merge( $row, _operation_list( $cond['operations']));
                       $rows[] = $row;
                   }
               }
@@ -569,33 +591,37 @@ function ocs_admin_campaign_rule_theme( $form)
               $q_arg = array( 'query' => array( 'event_name' => $element['#event_name']));
 			  if ( $no_cond == 0) {
 				$rows[] = array( 
-                        $rule_section,
-						array('data' => 'Conditions', 'colspan' => '2', 'class' => array('bd-btm')),
+                        array(),
+						array('data' => 'Conditions'),
 						array('data' => t('There are no conditions yet. <a href="@url">Add Conditions</a>.',
 				array( '@url' => url( t( 'ocs_admin/campaign/@campaign/rule/@rule/cond/0/add', $t_arg), $q_arg))),
-                            'class' => array('bd-btm')),
-                );
+                ));
 			  }
 
               // add actions
               foreach( $form['#rule'][$rule_id]['action'] as $action_id => $action) {
                   $operations = theme_action_list( $action['operations']);
 
-                  $row = array();
                   if ( $idx ++ == 0) {
-                      $row[] = array( 'data' => 'Actions'. $operations, 'rowspan' => max( 1, $no_action)); 
+                      $row = array(
+                        array(''),
+                        array( 'data' => 'Actions'. $operations, 'colspan' => '2', 'class' => array('bd-top')));
+                      $row = array_merge( $row, _operation_list( $cond['operations']));
+                      $rows[] = $row;
                   }
-                  $row[] = array( 'data' => $action['info']);
+                  $row = array(
+                    array(''),
+                    array( 'data' => $action['info']));
                   $rows[] = $row;
-
               }
 
 			  if ( $no_action == 0) {
 				$rows[] = array( 
-						array('data' => 'Actions', 'colspan' => '2', 'class' => array('bd-top', 'bd-btm')),
+						array(),
+						array('data' => 'Actions', 'class' => array('bd-top', 'dotted')),
 						array('data' => t('There are no actions yet. <a href="@url">Add Actions</a>.',
 				            array( '@url' => url( t( 'ocs_admin/campaign/@campaign/rule/@rule/action/add', $t_arg), $q_arg))),
-                            'class' => array('bd-top', 'bd-btm')));
+                            'class' => array( 'bd-top', 'dotted')));
 			  }
 
 
@@ -618,6 +644,15 @@ function ocs_admin_campaign_rule_theme( $form)
 	  return $output;
 }
 
+function _indentation( $tabs) 
+{
+    $output = '';
+    for( $i =0; $i < $tabs; $i++) {
+        $output .= '<div class="indentation"></div>';
+    }
+    return $output;
+}
+
 function theme_action_list( $list)
 {
     $output = '<ul class="action-links">';
@@ -627,6 +662,17 @@ function theme_action_list( $list)
     $output .= '</ul>';
 
     return $output;
+}
+
+function _operation_list( $list)
+{
+    $operations = array();
+    foreach( element_children( $list) as $op) {
+      $operations[] = array( 'data' => drupal_render($list[$op]),
+        'class' => array('menu-operations'));
+    }
+
+    return $operations;
 }
 
 /*

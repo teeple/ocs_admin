@@ -55,6 +55,14 @@ border: 0 none;
     border-top: solid 1px;
 }
 
+.bd-top.dotted {
+    border-top: dotted 1px;
+}
+
 .bd-btm {
     border-bottom: solid 1px;
+}
+
+.bd-btm.dotted {
+    border-bottom: dotted 1px;
 }

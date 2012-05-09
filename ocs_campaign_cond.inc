@@ -3,8 +3,7 @@
 function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id, $rule_id, $cond_id, $op = NULL)
 {
 	$cond = isset( $form_state['values']['cond']) ? $form_state['values']['cond'] : NULL;
-	$cond_idx = isset( $form_state['values']['cond_idx']) ? $form_state['values']['cond_idx'] : 
-        isset( $_GET['idx']) ? $_GET['idx'] : time();
+	$cond_idx = isset( $_GET['idx']) ? $_GET['idx'] : time();
 
 	if ( $op == 'edit') {
 		// it's editing mode
@@ -305,24 +304,23 @@ function ocs_admin_campaign_condition_add( $cond)
 }
 
 
-function ocs_admin_campaign_cond_delete_confirm( $form, &$form_state, $campaign_id, $cond_id)
+function ocs_admin_campaign_cond_delete_confirm( $form, &$form_state, $campaign_id, $rule_id, $cond_id)
 {
 	$cond_name = isset( $_GET['name']) ? $_GET['name'] : 'Condition ID:' . $cond_id;
 
     $form['#campaign_id'] = $campaign_id;
+    $form['#rule_id'] = $rule_id;
     $form['#cond_id'] = $cond_id;
     $form['#cond_name'] = $cond_name;
     $form['#cond_idx'] = isset( $_GET['idx']) ? $_GET['idx'] : '0';
 
-    $caption = '<p>' . 
-            t('<strong>Warning:</strong> The condition "%key" will be deleted from the Campaign.',
-                array( '%key' => $cond_name)) .
-            '</p>';
+    $caption = t('<p><strong>Warning:</strong> %name of the Rule %id will be deleted from the Campaign.</p>',
+        array( '%id' => $rule_id, '%name' => ($cond_id == 0) ? t('All the conditions') : 
+            t( 'The condition "%key"', array( '%key' => $cond_name))));
 
     $caption .= '<p>'. t('This action cannot be undone.') . '</p>';
 
-    return confirm_form( $form, t('Are you sure to delete the event "%key"?',
-        array( '%key' => $cond_name)),
+    return confirm_form( $form, t('Are you sure to delete the condition ?'),
         'ocs_admin/campaign/' . $campaign_id . '/rule',
         $caption, t('Delete'));
 }
@@ -331,13 +329,13 @@ function ocs_admin_campaign_cond_delete_confirm_submit( $form, &$form_state)
 {
     $campaign_id = $form['#campaign_id'];
     $cond = array(
+        'rule_id' => $form['#rule_id'],
         'cond_id' => $form['#cond_id'],
         'cond_idx' => $form['#cond_idx'],
     );
     ocs_admin_campaign_condition_delete( $cond);
 
-    drupal_set_message( t('The condition "%key" has been removed from the Campaign.', 
-			array( '%key' => $form['#cond_name'])));
+    drupal_set_message( t('The condition has been removed from the Campaign.'));
 
     $form_state['redirect'] = 'ocs_admin/campaign/' . $campaign_id . '/rule';
 }
@@ -345,12 +343,20 @@ function ocs_admin_campaign_cond_delete_confirm_submit( $form, &$form_state)
 function ocs_admin_campaign_condition_delete( $cond)
 {
     db_set_active( 'ocsdb');
+    dpm( $cond, 'cond delete');
 
 	// delete event from campaign
-	$result = db_delete( 'ocs_campaign_conditions')
-		->condition( 'cond_id', $cond['cond_id'], '=')
-		->condition( 'cond_idx', $cond['cond_idx'], '=')
-		->execute();
+    $query = db_delete( 'ocs_campaign_conditions');
+    if ( $cond['cond_id'] == 0) {
+        $query->condition( 'rule_id', $cond['rule_id'], '=');
+    }
+    else {
+        $query->condition( 'cond_id', $cond['cond_id'], '=')
+            ->condition( 'cond_idx', $cond['cond_idx'], '=');
+    }
+
+    $result = $query->execute();
+
 	dpm( $result, 'ocs_campaign_condition result');
 
     db_set_active( 'default');
