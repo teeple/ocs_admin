@@ -1,15 +1,20 @@
 <?php
 
+
 function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id, $rule_id, $cond_id, $op = NULL)
 {
 	$cond = isset( $form_state['values']['cond']) ? $form_state['values']['cond'] : NULL;
-	$cond_idx = isset( $_GET['idx']) ? $_GET['idx'] : time();
+	$cond_idx = isset( $_GET['idx']) ? $_GET['idx'] : 
+        (isset( $form_state['values']) ? $form_state['values']['cond_idx'] : time());
+    $operator = isset( $form_state['values']) ? $form_state['values']['operator'] : NULL;
 
 	if ( $op == 'edit') {
 		// it's editing mode
 		$condition = ocs_admin_campaign_cond_load( $cond_id, $cond_idx);
 		if ( ! isset( $cond))
             $cond = $condition['rule_id'].':'.$condition['param_id'];
+        if ( ! isset( $operator))
+            $operator = $condition['operator'];
 	}
 
 
@@ -67,7 +72,7 @@ function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id, $r
 
 			// add additional condition if the parameter is 'account key' type
 			if ( $para->field_ocs_param_type['und'][0]['value'] == OCS_PARAM_TYPE_ACCOUNT_KEY) {
-				$paramlist[$key.':account'] = $options[ $node->title][ $key.':account'] = t( 'account of the @val party', array( '@val' => $value));
+				$paramlist[$key.':account'] = $options[ $node->title][ $key.':account'] = t( 'counter of the @val party', array( '@val' => $value));
 				$paramlist[$para->nid.':account'] = OCS_PARAM_TYPE_ACCOUNT_KEY;
 				// reset the type of original parameter as string
 				$paramlist[$para->nid] = OCS_PARAM_TYPE_STRING;		
@@ -78,10 +83,9 @@ function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id, $r
 		module_load_include( 'inc', 'ocs_admin', 'ocs_counter');
 		$counter_list = ocs_admin_counter_name_load_all();
 		$counters = array();
-		foreach( $counter_list as $id => $value) {
-			$counters[$id] = $value['counter_name'];
+		foreach( $counter_list as $value) {
+			$counters[ $value['counter_name']] = $value['counter_name'];
 		}
-
 	}
 
 //    dpm( $paramlist, 'param list');
@@ -133,6 +137,10 @@ function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id, $r
         '#title' => 'Operator',
         '#options' => _campaign_operator( $paramlist, $cond),
         '#default_value' => isset($condition) ? $condition['operator'] : NULL,
+        '#ajax' => array(
+            'callback' => 'ocs_admin_ajax_change_operator',
+            'wrapper' => 'change_operator_div',
+            ),
     );
 
     $form['container']['valueset'] = array(
@@ -156,12 +164,26 @@ function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id, $r
 
 
     if ( $direct_input ) {
-        $form['container']['valueset']['value'] = array(
+        $form['container']['valueset']['values'] = array(
+            '#type' => 'container',
+            '#prefix' => '<div id="change_operator_div">',
+            '#suffix' => '</div>',
+        );
+
+        $form['container']['valueset']['values']['value'] = array(
             '#type' => 'textfield',
             '#title' => 'Value',
             '#size' => 30,
             '#default_value' => isset($condition) ? $condition['value'] : NULL,
         );
+
+        if ( $operator == 'between') {
+            $form['container']['valueset']['values']['value2'] = array(
+                '#type' => 'textfield',
+                '#size' => 30,
+                '#default_value' => isset($condition) ? $condition['value2'] : NULL,
+            );
+        }
     }
     else {
         $form['container']['valueset']['value_list'] = array(
@@ -192,43 +214,60 @@ function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id, $r
 
 function _campaign_operator( $paramlist, $selected)
 {
-	dpm( $paramlist, 'param');
-	dpm( $selected, 'selected');
+//	dpm( $paramlist, 'param');
+//	dpm( $selected, 'selected');
+
+    $type = _get_param_type( $paramlist, $selected);
 	$oplist = array(
 		OCS_PARAM_TYPE_STRING => array(
-			'=', '>', '>=', '<', '<=', 'starts', 'in list', 'between',
+			'=', 'starts', 
 			),
 		OCS_PARAM_TYPE_INTEGER => array(
-			'integer', 'equal to', 'not equal to', 'greater than', 'less than'
+			'=', '>', '>=', '<', '<=', 'between',
 			),
 		OCS_PARAM_TYPE_ENUM => array(
-			'enum', 'contains', 'equal to', 'not equal to'
+			'=', 'in list',
 			),
 		OCS_PARAM_TYPE_ACCOUNT_KEY => array(
-			'account key', 'contains', 'equal to', 'not equal to'
+			'=', '>', '>=', '<', '<=', 'between',
 			),
 		OCS_PARAM_TYPE_DATE => array(
+			'=', '>', '>=', '<', '<=', 'between',
             ),
 		OCS_PARAM_TYPE_TIME => array(
+			'=', '>', '>=', '<', '<=', 'between',
             ),
 		OCS_PARAM_TYPE_PRODUCT_KEY => array(
+			'=', '>', '>=', '<', '<=', 'between',
             ),
 	);
 
+	return drupal_map_assoc( $oplist[$type]);
+}
+
+
+function _get_param_type( $paramlist, $selected)
+{
+//    dpm( $selected, 'get_param');
 	$list = explode( ':', $selected);       // event:param:account
     if ( count( $list) == 3) {
-        if ( $list[2] == 'account') return drupal_map_assoc( $oplist[OCS_PARAM_TYPE_ACCOUNT_KEY]);
+        if ( $list[2] == 'account') return OCS_PARAM_TYPE_ACCOUNT_KEY;
     }
     else if ( isset( $paramlist[ $list[1]])) {  // param
-		return drupal_map_assoc( $oplist[$paramlist[$list[1]]]);
+		return $paramlist[$list[1]];
 	}
 
-	return drupal_map_assoc( array('unknown parameter type'));
+    return OCS_PARAM_TYPE_STRING;
 }
 
 function ocs_admin_ajax_change_param( $form, $form_state)
 {
 	return $form['container']['param'];
+}
+
+function ocs_admin_ajax_change_operator( $form, $form_state)
+{
+	return $form['container']['valueset']['values'];
 }
 
 function ocs_admin_ajax_value_type( $form, $form_state)
@@ -237,6 +276,55 @@ function ocs_admin_ajax_value_type( $form, $form_state)
 }
 
 
+function ocs_admin_campaign_add_cond_form_validate( $form, &$form_state)
+{
+    $values = $form_state['values'];
+//    dpm( $values, 'form state');
+    if ( $values['value_type']) {
+        // direct input
+        // value textfield cannot be empty
+        if ( empty($values['value'])) {
+            form_set_error( 'value', t('Value cannot be empty.'));
+        }
+
+        $type = _get_param_type( $form['#paramlist'], $values['cond']);
+
+        foreach( array( 'value', 'value2') as $key) {
+            $value = $values[$key];
+            $t_arg = array( '%v' => $value);
+            switch( $type) {
+                case OCS_PARAM_TYPE_INTEGER:
+                case OCS_PARAM_TYPE_ACCOUNT_KEY:    // digits
+                    if ( ! is_numeric($value)) {
+                        form_set_error( $key, t('Invalid value "%v". Must be numeric.', $t_arg));
+                    }
+                    break;
+                case OCS_PARAM_TYPE_DATE:   // yyyyMMdd, MMdd
+                    $length = strlen( $value);
+                    if ( ! is_numeric($value) || !($length == 4 || $length == 8)) {
+                        form_set_error( $key, t('Invalid date value "%v". Must be in "yyyyMMdd" format.', $t_arg));
+                    }
+                    $year = ($length == 8) ? substr( $value, 0, 4) : date('Y');
+                    $month = substr( $value, -4, 2);
+                    $day = substr( $value, -2);
+                    if ( ! checkdate( $month, $day, $year)) {
+                        $t_arg['%year'] = $year;
+                        $t_arg['%mon'] = $month;
+                        $t_arg['%day'] = $day;
+                        form_set_error( $key, t('Invalid date value "%v":%year-%mon-%day. Must be in "yyyyMMdd" format.', $t_arg));
+                    }
+
+                    break;
+                case OCS_PARAM_TYPE_TIME:   // HHMM
+                    if ( ! is_numeric($value) || $value < 0 || $value > 2400) {
+                        form_set_error( $key, t('Invalid time value "%v", Must be in "HHMM" format.', $t_arg));
+                    }
+                    break;
+            }
+        }
+    }
+
+}
 
 function ocs_admin_campaign_add_cond_form_submit( $form, &$form_state)
 {
@@ -252,12 +340,15 @@ function ocs_admin_campaign_add_cond_form_submit( $form, &$form_state)
 			'param_name' => $form['#paramlist'][ $values['cond']],
 			'operator' => $values['operator'],
 			'value' => $values['value'],
-			'cond_name' => t( '@para @op @value', array( 
+			'value2' => $values['value2'],
+			'cond_name' => t( '@counter @para @op @value @value2', array( 
+                    '@counter' => isset($values['counter']) ? $values['counter'] : '',
 					'@para' =>  $form['#paramlist'][ $values['cond']],
 					'@op' => $values['operator'],
-					'@value' => $values['value'])),
+					'@value' => $values['value'],
+                    '@value2' => ($values['operator'] == 'between') ? 'and '. $values['value2'] : '')),
 		);
-//        dpm( $cond, 'condition to submit');
+        dpm( $cond, 'condition to submit');
         if ( $form['#op'] == 'edit')
             ocs_admin_campaign_condition_save( $cond);
         else
