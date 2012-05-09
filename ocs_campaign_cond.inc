@@ -200,7 +200,7 @@ function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id, $r
 
 	$form['actions']['submit'] = array(
 		'#type' => 'submit',
-		'#value' => t('Save configuration'),
+		'#value' => t('Save Configuration'),
 	);
 
 	$form['actions']['cancel'] = array(
@@ -516,6 +516,68 @@ function ocs_admin_ajax_add_campaign_rule( $campaign_id, $event_id, $js)
 		return $output;
 	}
 }
+
+function ocs_admin_add_campaign_rule_form( $form, &$form_state, $campaign_id, $event_id)
+{
+    $form['#campaign_id'] = $campaign_id;
+    $form['#event_id'] = $event_id;
+
+	$form['event'] = array(
+		'#type' => 'item',
+		'#title' => t( 'Event : <em>@name</em>', array('@name' => $_GET['event_name'])), 
+	);
+
+    $form['rule_name'] = array(
+        '#type' => 'textfield',
+        '#title' => 'Rule Name',
+        '#size' => 30,
+    );
+
+	$form['actions'] = array( 
+        '#type' => 'actions',
+        '#weight' => '20',
+    );
+
+	$form['actions']['submit'] = array(
+		'#type' => 'submit',
+		'#value' => t('Save'),
+	);
+
+	$form['actions']['cancel'] = array(
+		'#type' => 'submit',
+		'#value' => t('Cancel'),
+	);
+
+
+    return $form;
+}
+
+function ocs_admin_add_campaign_rule_form_validate( $form, &$form_state)
+{
+    $values = $form_state['values'];
+    if ( empty( $values['rule_name'])) {
+        form_set_error( 'rule_name', 'Invalid rule name.');
+    }
+}
+
+
+function ocs_admin_add_campaign_rule_form_submit( $form, &$form_state)
+{
+    if ( $form_state['values']['op'] != 'Cancel') {
+        // add a new rule
+        $rule = array(
+            'campaign_id' => $form['#campaign_id'],
+            'event_id' => $form['#event_id'],
+            'rule_name' => $form_state['values']['rule_name'],
+        );
+
+//        dpm( $rule, 'rule');
+        ocs_admin_campaign_rule_save( $rule);
+    }
+
+	$form_state['redirect'] = 'ocs_admin/campaign/' . $form['#campaign_id'] . '/rule';
+}
+
 
 /*
     get condition list
