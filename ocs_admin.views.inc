@@ -55,6 +55,10 @@ function ocs_admin_views_data() {
     $campaign = ocs_admin_table_campaign();
     $data = array_merge( $data, $campaign);
 //  dpm( $data, 'view_data');
+
+    $group_account = ocs_admin_group_account_view();
+    $data = array_merge( $data, $group_account);
+
     return $data;
 }    
 
@@ -195,7 +199,6 @@ function ocs_admin_table_account()
             'label' => t('Member'),
         ),
     );
-
 
     return $data;
 }    
@@ -1047,6 +1050,45 @@ function ocs_admin_table_campaign()
     return $data;
 	
 }
+
+function ocs_admin_group_account_view()
+{
+    // ocs_counter
+    $data['ocs_group_account_key']['table']['name'] = 'ocsdata.ocs_group_account_key';
+    $data['ocs_group_account_key']['table']['group'] = t('OCS Group');
+    $data['ocs_group_account_key']['table']['base'] = array(
+        'field' => 'customer_id',
+        'title' => t('OCS Group Account'),
+        'help' => t('Account list related group'),
+        'database' => 'ocsdb',
+        'weight' => -10,
+    );
+
+    $data['ocs_group_account_key']['customer_id'] = _get_string_field( array( 
+        'title'=> t('Customer ID'), 
+        'help' => t('Customer ID')));
+    $data['ocs_group_account_key']['customer_name'] = _get_string_field( array( 
+        'title'=> t('Customer Name'), 
+        'help' => t('Customer Name')));
+    $data['ocs_group_account_key']['account_key'] = _get_string_field( array( 
+        'title'=> t('Account Key'), 
+        'help' => t('Account Key')));
+    $data['ocs_group_account_key']['status'] = _get_string_field( array( 
+        'title'=> t('Status'), 
+        'help' => t('Status')));
+    $data['ocs_group_account_key']['group_id'] = _get_string_field( array( 
+        'title'=> t('Group ID'), 
+        'help' => t('Group ID')));
+    $data['ocs_group_account_key']['ancestor_group_id'] = _get_string_field( array( 
+        'title'=> t('Ancestor Group ID'), 
+        'help' => t('Ancestor Group ID')));
+    $data['ocs_group_account_key']['group_name'] = _get_string_field( array( 
+        'title'=> t('Group Name'), 
+        'help' => t('Group Name')));
+
+    return $data;
+}
+	
 
 // view handler
 class views_handler_field_charging_type extends views_handler_field {

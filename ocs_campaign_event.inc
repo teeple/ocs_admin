@@ -76,11 +76,11 @@ function ocs_admin_campaign_events_load_all( $campaign_id)
     db_set_active('ocsdb');
 
     // get group information
-    $query = db_select( 'ocs_campaign_events', 'c');
+    $query = db_select( 'ocs_campaign_rules', 'c');
     $result = $query->condition( 'c.campaign_id', $campaign_id, '=')
         ->fields( 'c')
         ->execute()
-        ->fetchAllAssoc( 'event_id', PDO::FETCH_ASSOC);
+        ->fetchAllAssoc( 'rule_id', PDO::FETCH_ASSOC);
     
 
     db_set_active( 'default');
@@ -99,7 +99,7 @@ function ocs_admin_campaign_event_delete_confirm( $form, &$form_state, $campaign
     $form['#event_id'] = $event_id;
     $form['#event_name'] = $event_name;
     $caption = '<p>' . 
-            t('<strong>Warning:</strong> The event "%key" will be deleted from the Campaign.',
+            t('<strong>Warning:</strong> The event "%key" and all of its rules will be deleted from the Campaign.',
                 array( '%key' => $event_name)) .
             '</p>';
 
@@ -129,7 +129,7 @@ function ocs_admin_campaign_delete_event( $campaign_id, $event_id)
     db_set_active( 'ocsdb');
 
 	// delete event from campaign
-	$result = db_delete( 'ocs_campaign_events')
+	$result = db_delete( 'ocs_campaign_rules')
 		->condition( 'campaign_id', $campaign_id, '=')
 		->condition( 'event_id', $event_id, '=')
 		->execute();
@@ -150,7 +150,7 @@ function ocs_admin_campaign_event_save( $campaign)
 		$fields[$key] = $campaign[$key];
 	}
 
-    $status = db_merge( 'ocs_campaign_events')
+    $status = db_merge( 'ocs_campaign_rules')
         ->key( array( 'event_id' => $campaign['event_id'], 'campaign_id' => $campaign['campaign_id']))
         ->fields( $fields)
         ->execute();

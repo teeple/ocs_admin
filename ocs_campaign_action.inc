@@ -154,13 +154,13 @@ function ocs_admin_campaign_delete_action( $campaign_id, $action_id)
 /*
    get action list
    */
-function ocs_admin_campaign_actions_load_all( $campaign_id)
+function ocs_admin_campaign_actions_load_all( $rule_id)
 {
     db_set_active('ocsdb');
 
     // get group information
     $query = db_select( 'ocs_campaign_actions', 'c');
-    $result = $query->condition( 'c.campaign_id', $campaign_id, '=')
+    $result = $query->condition( 'c.rule_id', $rule_id, '=')
         ->fields( 'c')
         ->execute()
         ->fetchAllAssoc( 'action_id', PDO::FETCH_ASSOC);

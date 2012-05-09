@@ -47,3 +47,6 @@ ul.action-links a {
 background: lightgray;
 }
 
+.borderless {
+border: 0 none;
+}

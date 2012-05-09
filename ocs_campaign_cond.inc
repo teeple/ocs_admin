@@ -1,12 +1,51 @@
 <?php
 
-function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id = NULL, $event_id=NULL)
+function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id, $rule_id, $cond_id, $op = NULL)
 {
+	$cond = isset( $form_state['values']['cond']) ? $form_state['values']['cond'] : NULL;
+	$cond_idx = isset( $form_state['values']['cond_idx']) ? $form_state['values']['cond_idx'] : 0;
+
+	if ( $op == 'edit') {
+		// it's editing mode
+		$condition = ocs_admin_campaign_cond_load( $cond_id, $cond_idx);
+		if ( ! isset( $cond))
+            $cond = $condition['rule_id'].':'.$condition['param_id'];
+	}
+
+
+	$form = array();
+
+	$form['#campaign_id'] = $campaign_id;
+	$form['#rule_id'] = $rule_id;
+	$form['#cond_id'] = $cond_id;
+	$form['#op'] = $op;
+
+	$form['event'] = array(
+		'#type' => 'item',
+		'#title' => t( 'Event : <em>@name</em>', array('@name' => $_GET['event_name'])), 
+	);
+
+	$rule = &drupal_static( __FUNCTION__ . 'rule', array());
+    if ( empty( $rule)) {
+        // get event info
+        $rule = ocs_admin_campaign_rule_load( $rule_id);
+        if ( empty( $rule)) {
+            drupal_set_message( t('Unable to find rule %id.', array( '%id' => $rule_id)), 'error');
+            $form['actions'] = array('#type' => 'actions');
+            $form['actions']['cancel'] = array(
+                '#type' => 'submit',
+                '#value' => t('Cancel'),
+            );
+
+            return $form;
+        }
+    }
+//    dpm( $rule, 'rule');
+
+	$form['#event_id'] = $event_id = $rule['event_id'];
+
 	$options = &drupal_static( __FUNCTION__ . 'options', array());
 	$paramlist = &drupal_static( __FUNCTION__ . 'param', array());
-
-	$cond = isset( $form_state['values']['cond']) ? $form_state['values']['cond'] : NULL;
-
 	if ( empty( $options) || empty( $param)) {
 		$node = node_load( $event_id);
 //		dpm( $node, 'node');
@@ -16,20 +55,20 @@ function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id = N
 //				dpm( $para, 'parameter');
 
 			// store select options
-			$key = $event_id . ':' . $param['target_id'];
+			$key = $rule_id . ':' . $param['target_id'];
 			$value = $para->title;
 			$options[ $node->title][ $key] = $value;
 			// store parameter info
 			$paramlist[$para->nid] = $para->field_ocs_param_type['und'][0]['value'];
 			$paramlist[$key] = $value;
 			if ( ! isset( $cond)) {
-				$cond = $event_id . ':' . $param['target_id'];
+				$cond = $rule_id . ':' . $param['target_id'];
 			}
 
 			// add additional condition if the parameter is 'account key' type
 			if ( $para->field_ocs_param_type['und'][0]['value'] == OCS_PARAM_TYPE_ACCOUNT_KEY) {
-				$options[ $node->title][ $key.'account'] = $value . ' ...';
-				$paramlist[$para->nid.'account'] = OCS_PARAM_TYPE_ACCOUNT_KEY;
+				$paramlist[$key.':account'] = $options[ $node->title][ $key.':account'] = t( 'account of the @val party', array( '@val' => $value));
+				$paramlist[$para->nid.':account'] = OCS_PARAM_TYPE_ACCOUNT_KEY;
 				// reset the type of original parameter as string
 				$paramlist[$para->nid] = OCS_PARAM_TYPE_STRING;		
 			}
@@ -45,95 +84,98 @@ function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id = N
 
 	}
 
-	if ( isset( $cond_id)) {
-		// if cond_id is not NULL, it's editing mode
-		$condition = ocs_admin_campaign_cond_load( $cond_id);
-//		dpm( $condition, 'condition');
-		$cond = $condition['event_id'].':'.$condition['param_id'];
-	}
+//    dpm( $paramlist, 'param list');
 
-//	dpm( $options, 'options');
-	$form = array();
-
-	$form['#campaign_id'] = $campaign_id;
-	$form['#event_id'] = $event_id;
 	$form['#paramlist'] = $paramlist;
-	$form['#cond_id'] = $cond_id;
 
-	$form['event'] = array(
-		'#type' => 'markup',
-		'#markup' => t( 'Event : <em>@name</em>', array('@name' => $_GET['event_name'])), 
-	);
+    $form['cond_idx'] = array(
+        '#type' => 'hidden',
+        '#value' => $cond_idx,
+    );
 
-	$form['cond'] = array(
-		'#type' => 'select',
-		'#title' => t('Parameters'),
-		'#options' => $options,
-		'#default_value' => $cond,
-		'#ajax' => array(
-			'callback' => 'ocs_admin_ajax_condition_operator',
-			'wrapper' => 'replace_operator_div',
-			),
-	);
+    $form['container'] = array(
+        '#type' => 'fieldset',
+        '#title' => t( 'Condition'),
+        '#collapsible' => TRUE,
+        '#collapsed' => FALSE,
+        '#description' => t('Set the parameter and value.'),
+    );
 
-	$form['container'] = array(
-		'#type' => 'container',
-		'#prefix' => '<div id="replace_operator_div">',
-		'#suffix' => '</div>',
-	);
+    $form['container']['param'] = array(
+        '#type' => 'fieldset',
+//            '#title' => t('Select Parameter'),
+        '#prefix' => '<div id="change_param_div">',
+        '#suffix' => '</div>',
+        '#attributes' => array('class' => array('column', 'borderless'), 'style' => 'width:40%'),
+    );
 
-	if ( substr( $cond, -7) == 'account') {
-		$form['container']['counter'] = array(
-			'#type' => 'select',
-			'#title' => t('Counter'),
-			'#options' => $counters,
-		);
-	}
+    $form['container']['param']['cond'] = array(
+        '#type' => 'select',
+        '#title' => t('Parameter'),
+        '#options' => $options,
+        '#default_value' => $cond,
+        '#ajax' => array(
+            'callback' => 'ocs_admin_ajax_change_param',
+            'wrapper' => 'change_param_div',
+            ),
+    );
+
+    if ( substr( $cond, -7) == 'account') {
+        $form['container']['param']['counter'] = array(
+            '#type' => 'select',
+            '#title' => t('Counter'),
+            '#options' => $counters,
+        );
+    }
+
+    $form['container']['param']['operator'] = array(
+        '#type' => 'select',
+        '#title' => 'Operator',
+        '#options' => _campaign_operator( $paramlist, $cond),
+        '#default_value' => isset($condition) ? $condition['operator'] : NULL,
+    );
+
+    $form['container']['valueset'] = array(
+        '#type' => 'fieldset',
+//            '#title' => 'Set Value',
+        '#prefix' => '<div id="replace_value_div">',
+        '#suffix' => '</div>',
+        '#attributes' => array('class' => array( 'borderless'), 'style' => 'width:40%'),
+    );
+
+    $direct_input =  isset( $form_state['values']['value_type']) ? $form_state['values']['value_type'] : 1;
+    $form['container']['valueset']['value_type'] = array(
+        '#type' => 'checkbox',
+        '#title' => 'Input direct value',
+        '#default_value' => $direct_input,
+        '#ajax' => array(
+            'callback' => 'ocs_admin_ajax_value_type',
+            'wrapper' => 'replace_value_div',
+        ),
+    );
 
 
-	$form['container']['operator'] = array(
-		'#type' => 'select',
-		'#title' => 'Operator',
-		'#options' => _campaign_operator( $paramlist, $cond),
-		'#default_value' => isset($condition) ? $condition['operator'] : NULL,
-	);
+    if ( $direct_input ) {
+        $form['container']['valueset']['value'] = array(
+            '#type' => 'textfield',
+            '#title' => 'Value',
+            '#size' => 30,
+            '#default_value' => isset($condition) ? $condition['value'] : NULL,
+        );
+    }
+    else {
+        $form['container']['valueset']['value_list'] = array(
+            '#type' => 'select',
+            '#title' => 'Customer\'s Account Balance',
+            '#options' => $counters,
+        );
+    }
 
-	$form['valueset'] = array(
-		'#type' => 'fieldset',
-		'#title' => 'Value',
-		'#prefix' => '<div id="replace_value_div">',
-		'#suffix' => '</div>',
-	);
+	$form['actions'] = array( 
+        '#type' => 'actions',
+        '#weight' => '20',
+    );
 
-	$direct_input =  isset( $form_state['values']['value_type']) ? $form_state['values']['value_type'] : 1;
-	$form['valueset']['value_type'] = array(
-		'#type' => 'checkbox',
-		'#title' => 'Input direct value',
-		'#default_value' => $direct_input,
-		'#ajax' => array(
-			'callback' => 'ocs_admin_ajax_value_type',
-			'wrapper' => 'replace_value_div',
-		),
-	);
-
-
-	if ( $direct_input ) {
-		$form['valueset']['value'] = array(
-			'#type' => 'textfield',
-			'#title' => 'Value',
-			'#size' => 30,
-			'#default_value' => isset($condition) ? $condition['value'] : NULL,
-		);
-	}
-	else {
-		$form['valueset']['value_list'] = array(
-			'#type' => 'select',
-			'#title' => 'Customer\'s Account Balance',
-			'#options' => $counters,
-		);
-	}
-
-	$form['actions'] = array('#type' => 'actions');
 	$form['actions']['submit'] = array(
 		'#type' => 'submit',
 		'#value' => t('Save configuration'),
@@ -144,12 +186,14 @@ function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id = N
 		'#value' => t('Cancel'),
 	);
 
+
 	return $form;
 }
 
 function _campaign_operator( $paramlist, $selected)
 {
-//	dpm( $paramlist, 'param');
+	dpm( $paramlist, 'param');
+	dpm( $selected, 'selected');
 	$oplist = array(
 		OCS_PARAM_TYPE_STRING => array(
 			'string', 'contains', 'equal to', 'not equal to'
@@ -163,30 +207,33 @@ function _campaign_operator( $paramlist, $selected)
 		OCS_PARAM_TYPE_ACCOUNT_KEY => array(
 			'account key', 'contains', 'equal to', 'not equal to'
 			),
-		OCS_PARAM_TYPE_GROUP_ID => array(
-			'group id', 'contains', 'equal to', 'not equal to'
-			),
+		OCS_PARAM_TYPE_DATE => array(
+            ),
+		OCS_PARAM_TYPE_TIME => array(
+            ),
+		OCS_PARAM_TYPE_PRODUCT_KEY => array(
+            ),
 	);
 
-//	dpm( $selected, 'selected op');
-	list( $event, $param) = explode( ':', $selected);
-	if ( isset( $paramlist[ $param])) {
-		$para_type = $paramlist[ $param];
-//		dpm( $paramlist, 'paramlist');
-		return drupal_map_assoc( $oplist[$para_type]);
+	$list = explode( ':', $selected);       // event:param:account
+    if ( count( $list) == 3) {
+        if ( $list[2] == 'account') return drupal_map_assoc( $oplist[OCS_PARAM_TYPE_ACCOUNT_KEY]);
+    }
+    else if ( isset( $paramlist[ $list[1]])) {  // param
+		return drupal_map_assoc( $oplist[$paramlist[$list[1]]]);
 	}
 
 	return drupal_map_assoc( array('unknown parameter type'));
 }
 
-function ocs_admin_ajax_condition_operator( $form, $form_state)
+function ocs_admin_ajax_change_param( $form, $form_state)
 {
-	return $form['container'];
+	return $form['container']['param'];
 }
 
 function ocs_admin_ajax_value_type( $form, $form_state)
 {
-	return $form['valueset'];
+	return $form['container']['valueset'];
 }
 
 
@@ -196,12 +243,13 @@ function ocs_admin_campaign_add_cond_form_submit( $form, &$form_state)
 	$values = $form_state['values'];
 	dpm( $values, 'values submit');
 	if ( $values['op'] != 'Cancel') {
-		list( $event_id, $param_id) = explode( ':', $values['cond']);
+		$list = explode( ':', $values['cond']);     // format : 'rule_id:param_id:string'
+        $time = gettimeofday();
 		$cond = array(
-			'cond_id' => $form['#cond_id'],
-			'campaign_id' => $form['#campaign_id'],
-			'event_id' => $event_id,
-			'param_id' => $param_id,
+            'cond_id' => $form['#cond_id'],
+			'rule_id' => $list[0],
+			'cond_idx' => isset( $values['cond_idx']) ? $values['cond_idx'] : $time['sec'] * 1000 + $time['usec'],
+			'param_id' => $list[1] . (isset($list[2]) ? ':'.$list[2] : ''),
 			'param_name' => $form['#paramlist'][ $values['cond']],
 			'operator' => $values['operator'],
 			'value' => $values['value'],
@@ -210,7 +258,11 @@ function ocs_admin_campaign_add_cond_form_submit( $form, &$form_state)
 					'@op' => $values['operator'],
 					'@value' => $values['value'])),
 		);
-		ocs_admin_campaign_condition_save( $cond);
+//        dpm( $cond, 'condition to submit');
+        if ( $form['#op'] == 'edit')
+            ocs_admin_campaign_condition_save( $cond);
+        else
+            ocs_admin_campaign_condition_add( $cond);
 	}
 
 	$form_state['redirect'] = 'ocs_admin/campaign/' . $form['#campaign_id'] . '/rule';
@@ -223,11 +275,29 @@ function ocs_admin_campaign_condition_save( $cond)
 {
     db_set_active('ocsdb');
 
-	$result = db_merge( 'ocs_campaign_conditions')
-		->key( array( 'cond_id' => $cond['cond_id']))
+	$result = db_update( 'ocs_campaign_conditions')
+		->fields( $cond)
+		->condition( 'cond_id', $cond['cond_id'], '=')
+        ->condition( 'cond_idx', $cond['cond_idx'], '=')
+		->execute();
+    dpm( $result, 'db_update result');
+
+    db_set_active( 'default');
+
+	return $result;
+}
+
+/*
+    add OCS campaign condition
+*/
+function ocs_admin_campaign_condition_add( $cond)
+{
+    db_set_active('ocsdb');
+
+	$result = db_insert( 'ocs_campaign_conditions')
 		->fields( $cond)
 		->execute();
-    dpm( $result, 'db_merge result');
+    dpm( $result, 'db_insert result');
 
     db_set_active( 'default');
 
@@ -242,6 +312,8 @@ function ocs_admin_campaign_cond_delete_confirm( $form, &$form_state, $campaign_
     $form['#campaign_id'] = $campaign_id;
     $form['#cond_id'] = $cond_id;
     $form['#cond_name'] = $cond_name;
+    $form['#cond_idx'] = isset( $_GET['idx']) ? $_GET['idx'] : '0';
+
     $caption = '<p>' . 
             t('<strong>Warning:</strong> The condition "%key" will be deleted from the Campaign.',
                 array( '%key' => $cond_name)) .
@@ -258,35 +330,55 @@ function ocs_admin_campaign_cond_delete_confirm( $form, &$form_state, $campaign_
 function ocs_admin_campaign_cond_delete_confirm_submit( $form, &$form_state)
 {
     $campaign_id = $form['#campaign_id'];
-    $cond_id = $form['#cond_id'];
-    $cond_name = $form['#cond_name'];
-    ocs_admin_campaign_condition_delete( $cond_id);
+    $cond = array(
+        'cond_id' => $form['#cond_id'],
+        'cond_idx' => $form['#cond_idx'],
+    );
+    ocs_admin_campaign_condition_delete( $cond);
 
     drupal_set_message( t('The condition "%key" has been removed from the Campaign.', 
-			array( '%key' => $cond_name)));
+			array( '%key' => $form['#cond_name'])));
 
     $form_state['redirect'] = 'ocs_admin/campaign/' . $campaign_id . '/rule';
 }
 
-function ocs_admin_campaign_condition_delete( $cond_id)
+function ocs_admin_campaign_condition_delete( $cond)
 {
     db_set_active( 'ocsdb');
 
 	// delete event from campaign
 	$result = db_delete( 'ocs_campaign_conditions')
-		->condition( 'cond_id', $cond_id, '=')
+		->condition( 'cond_id', $cond['cond_id'], '=')
+		->condition( 'cond_idx', $cond['cond_idx'], '=')
 		->execute();
 	dpm( $result, 'ocs_campaign_condition result');
 
     db_set_active( 'default');
 }
 
-function ocs_admin_campaign_cond_load( $cond_id)
+
+function ocs_admin_campaign_cond_load( $cond_id, $cond_idx)
 {
     db_set_active( 'ocsdb');
 
     $query = db_select( 'ocs_campaign_conditions', 'c');
     $result = $query->condition( 'c.cond_id', $cond_id, '=')
+        ->condition( 'c.cond_idx', $cond_idx, '=')
+        ->fields( 'c')
+        ->execute()
+        ->fetchAssoc();
+
+    db_set_active( 'default');
+
+	return $result;
+}
+
+function ocs_admin_campaign_rule_load( $rule_id)
+{
+    db_set_active( 'ocsdb');
+
+    $query = db_select( 'ocs_campaign_rules', 'c');
+    $result = $query->condition( 'c.rule_id', $rule_id, '=')
         ->fields( 'c')
         ->execute()
         ->fetchAssoc();
@@ -342,23 +434,29 @@ function ocs_admin_campaign_conditions_load_all( $campaign_id)
 
     // get group information
     $query = db_select( 'ocs_campaign_conditions', 'c');
-    $result = $query->condition( 'c.campaign_id', $campaign_id, '=')
+    $query->join( 'ocs_campaign_rules', 'r', 'r.rule_id = c.rule_id');  // join with rules table
+    $result = $query->condition( 'r.campaign_id', $campaign_id, '=')
         ->fields( 'c')
-        ->execute()
-        ->fetchAllAssoc( 'cond_id', PDO::FETCH_ASSOC);
+        ->execute();
 
-//    dpm( $result, 'result');
+    $records = array();
+    while( $record = $result->fetchAssoc()) 
+    {
+        $records[ $record['rule_id']][] = $record;
+    }
+
+    dpm( $records, 'conditions');
 
     db_set_active( 'default');
 
-    return $result;
+    return $records;
 }
 
 function ocs_admin_campaign_rule_save( $rule)
 {
     db_set_active('ocsdb');
 
-	$result = db_insert( 'ocs_campaign_rule')
+	$result = db_insert( 'ocs_campaign_rules')
 		->fields( $rule)
 		->execute();
     dpm( $result, 'db_merge result');
@@ -373,7 +471,7 @@ function ocs_admin_campaign_rule_delete( $rule_id)
 {
     db_set_active('ocsdb');
 
-	$result = db_delete( 'ocs_campaign_rule')
+	$result = db_delete( 'ocs_campaign_rules')
 		->condition( 'rule_id', $rule_id, '=')
 		->execute();
 
