@@ -3,7 +3,8 @@
 function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id, $rule_id, $cond_id, $op = NULL)
 {
 	$cond = isset( $form_state['values']['cond']) ? $form_state['values']['cond'] : NULL;
-	$cond_idx = isset( $form_state['values']['cond_idx']) ? $form_state['values']['cond_idx'] : 0;
+	$cond_idx = isset( $form_state['values']['cond_idx']) ? $form_state['values']['cond_idx'] : 
+        isset( $_GET['idx']) ? $_GET['idx'] : time();
 
 	if ( $op == 'edit') {
 		// it's editing mode
@@ -241,14 +242,13 @@ function ocs_admin_ajax_value_type( $form, $form_state)
 function ocs_admin_campaign_add_cond_form_submit( $form, &$form_state)
 {
 	$values = $form_state['values'];
-	dpm( $values, 'values submit');
+//	dpm( $values, 'values submit');
 	if ( $values['op'] != 'Cancel') {
 		$list = explode( ':', $values['cond']);     // format : 'rule_id:param_id:string'
-        $time = gettimeofday();
 		$cond = array(
             'cond_id' => $form['#cond_id'],
 			'rule_id' => $list[0],
-			'cond_idx' => isset( $values['cond_idx']) ? $values['cond_idx'] : $time['sec'] * 1000 + $time['usec'],
+			'cond_idx' => $values['cond_idx'],
 			'param_id' => $list[1] . (isset($list[2]) ? ':'.$list[2] : ''),
 			'param_name' => $form['#paramlist'][ $values['cond']],
 			'operator' => $values['operator'],
@@ -393,20 +393,15 @@ function ocs_admin_campaign_rule_load( $rule_id)
    add or delete rule
 
    */
-function ocs_admin_ajax_add_campaign_rule( $campaign_id, $event_or_rule_id, $js, $op)
+function ocs_admin_ajax_add_campaign_rule( $campaign_id, $event_id, $js)
 {
-	if ( $op == 'delete') {
-		ocs_admin_campaign_rule_delete( $event_or_rule_id);
-	}
-	else {	// add
-		// add a new rule
-		$rule = array(
-			'campaign_id' => $campaign_id,
-			'event_id' => $event_or_rule_id,
-		);
+    // add a new rule
+    $rule = array(
+        'campaign_id' => $campaign_id,
+        'event_id' => $event_id,
+    );
 
-		ocs_admin_campaign_rule_save( $rule);
-	}
+    ocs_admin_campaign_rule_save( $rule);
 
 	$form = drupal_get_form( 'ocs_admin_campaign_rule_form', $campaign_id);
 
@@ -479,3 +474,37 @@ function ocs_admin_campaign_rule_delete( $rule_id)
 
 	return $result;
 }
+
+function ocs_admin_campaign_rule_delete_confirm( $form, &$form_state, $campaign_id, $rule_id)
+{
+    $name = 'Rule ID:'.$rule_id;
+    $form['#campaign_id'] = $campaign_id;
+    $form['#rule_id'] = $rule_id;
+
+    $caption = '<p>' . 
+            t('<strong>Warning:</strong> The "@name" will be deleted from the Campaign.',
+                array( '@name' => $name)) .
+            '</p>';
+
+    $caption .= '<p>'. t('This action cannot be undone.') . '</p>';
+
+    return confirm_form( $form, t('Are you sure to delete the rule "%key"?',
+        array( '%key' => $name)),
+        'ocs_admin/campaign/' . $campaign_id . '/rule',
+        $caption, t('Delete'));
+}
+
+function ocs_admin_campaign_rule_delete_confirm_submit( $form, &$form_state)
+{
+    $campaign_id = $form['#campaign_id'];
+    $rule_id = $form['#rule_id'];
+
+    ocs_admin_campaign_rule_delete( $rule_id);
+
+    drupal_set_message( t('The Rule %key has been removed from the Campaign.', 
+			array( '%key' => $rule_id)));
+
+    $form_state['redirect'] = 'ocs_admin/campaign/' . $campaign_id . '/rule';
+}
+
+

@@ -1249,8 +1249,6 @@ function group_load_all()
 */
 function ocs_admin_group_select($impl, $js=NULL, $type='group', $id=NULL)
 {
-    dsm('ocs_admin_group_select');
-    
     $arg = array(
         $type . '_id' => $id,
     );
@@ -1442,11 +1440,10 @@ function ocs_admin_group_add_page_wizard_submit( $form, &$form_state)
 **************************************/
 function ocs_admin_subgroup_add_page( $group_id, $arg = NULL, $init = TRUE)
 {
-    if (! isset($_SESSION['ocs_admin_subgroup_save'])) {
-        $_SESSION['ocs_admin_subgroup_save'] = array();
+    if (! isset($_SESSION['ocs_admin_group_save'])) {
+        $_SESSION['ocs_admin_group_save'] = array();
     }
-    
-    $form = drupal_get_form('ocs_admin_subgroup_add_page_wizard', $group_id, $_SESSION['ocs_admin_subgroup_save']);
+    $form = drupal_get_form('ocs_admin_subgroup_add_page_wizard', $group_id, $_SESSION['ocs_admin_group_save']);
     $output = '<div id="ocs_admin_subgroup_page_div">' . drupal_render( $form) . '</div>';
     
     return $output;
@@ -1454,8 +1451,6 @@ function ocs_admin_subgroup_add_page( $group_id, $arg = NULL, $init = TRUE)
 
 function ocs_admin_subgroup_add_page_wizard( $form, &$form_state, $group_id, $arg = NULL)
 {
-    dpm($group_id, 'group_id');
-    dpm($arg, 'arg'); 
     $form = array();
     $form['section'] = array(
         '#type' => 'fieldset',
@@ -1491,9 +1486,7 @@ function ocs_admin_subgroup_add_page_wizard( $form, &$form_state, $group_id, $ar
     $subgroups = ocs_admin_subgroup_load( $group_id);
     $options = array();
     foreach( $subgroups as $key => $value) {
-        if ($value['parent_group_id'] != '0') {
-            $options[ $key] = $value['group_name'];
-        }
+        $options[ $key] = $value['group_name'];
     }
 
     $form['section']['subgroup']['parent_group_id'] = array(
@@ -1539,7 +1532,6 @@ function ocs_admin_subgroup_add_page_wizard( $form, &$form_state, $group_id, $ar
         '#type' => 'submit',
         '#value' => t('Cancel'),
     );
-
     if ( isset($arg['group_id'])) {
         $group = group_load( $arg['group_id']);
         $form['section']['subgroup']['group_id']['#value'] = $group['group_id'];
@@ -1560,10 +1552,13 @@ function ocs_admin_subgroup_add_page_wizard( $form, &$form_state, $group_id, $ar
 function ocs_admin_subgroup_add_page_wizard_submit( $form, &$form_state)
 {
     if ( $form_state['values']['op'] == 'Search Account') {
-        dpm($form_state, 'values');
+        $_SESSION['form_mode'] = 'M';
+        dpm($form_state, 'form_satate');
         $query = array(
+            'ancestor_group_id' => $form_state['values']['ancestor_group_id'],
             'account_key' => $values['master_number'],
         );
+        dpm($query, 'query');
         drupal_goto( 'ocs_admin/account/group/master/select', array( 'query' => $query));
     }
     else if ( $form_state['values']['op'] != 'Cancel') {

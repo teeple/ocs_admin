@@ -50,3 +50,11 @@ background: lightgray;
 .borderless {
 border: 0 none;
 }
+
+.bd-top {
+    border-top: solid 1px;
+}
+
+.bd-btm {
+    border-bottom: solid 1px;
+}
