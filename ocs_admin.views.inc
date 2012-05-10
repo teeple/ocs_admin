@@ -1072,8 +1072,8 @@ function ocs_admin_group_account_view()
         'help' => t('Customer Name')));
     $data['ocs_group_account_key']['account_key'] = _get_string_field( array( 
         'title'=> t('Account Key'), 
-        'help' => t('Account Key')));
-    $data['ocs_group_account_key']['status'] = _get_string_field( array( 
+       'help' => t('Account Key')));
+    $data['ocs_group_account_key']['status'] = _get_enum_field( 'status', array(
         'title'=> t('Status'), 
         'help' => t('Status')));
     $data['ocs_group_account_key']['group_id'] = _get_string_field( array( 
@@ -1180,4 +1180,20 @@ class views_handler_field_usable_type extends views_handler_field {
     return ( isset( $this->options['term_list'][$value])) ? $this->options['term_list'][$value] : $value;
   }
 }
+
+class views_handler_field_status extends views_handler_field {
+
+  function init(&$view, &$options) {
+    parent::init($view, $options);
+    if (empty($this->options['term_list'])) {
+        $this->options['term_list'] = ocs_admin_get_term_list( 'status');
+    }
+  }
+
+  function render($values) {
+    $value = $this->get_value($values);
+    return ( isset( $this->options['term_list'][$value])) ? $this->options['term_list'][$value] : $value;
+  }
+}
+
 
