@@ -66,3 +66,7 @@ border: 0 none;
 .bd-btm.dotted {
     border-bottom: dotted 1px;
 }
+
+.white-cell {
+    background-color: white;
+}

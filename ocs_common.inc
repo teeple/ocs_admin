@@ -7,6 +7,7 @@ define( 'OCS_PARAM_TYPE_ACCOUNT_KEY', '4');
 define( 'OCS_PARAM_TYPE_DATE', '5');
 define( 'OCS_PARAM_TYPE_TIME', '6');
 define( 'OCS_PARAM_TYPE_PRODUCT_KEY', '7');
+define( 'OCS_PARAM_TYPE_COUNTER', '8');
 
 function ocs_admin_get_param_type( $name)
 {
@@ -18,9 +19,15 @@ function ocs_admin_get_param_type( $name)
         'date' => OCS_PARAM_TYPE_DATE,
         'time' => OCS_PARAM_TYPE_TIME,
         'product_key' => OCS_PARAM_TYPE_PRODUCT_KEY,
+        'counter' => OCS_PARAM_TYPE_COUNTER,
     );
 
-    return isset( $optype[$name]) ? $optype[$name] : OCS_PARAM_TYPE_STRING;
+    if (isset( $optype[$name])) return $optype[$name];
+        
+    drupal_set_message( t( 'Undefined Open Parameter Type "@name". It shall be registered as STRING type.', 
+        array( '@name' => $name)), 'warning');
+
+    return OCS_PARAM_TYPE_STRING;
 }
 
 /*

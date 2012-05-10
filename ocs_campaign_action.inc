@@ -1,12 +1,22 @@
 <?php
 
 
-function ocs_admin_campaign_action_form( $form, &$form_state, $campaign_id, $action_id = NULL)
+function ocs_admin_campaign_action_form( $form, &$form_state, $campaign_id, $rule_id, $action_id = NULL)
 {
     $form['body'] = array(
         '#type' => 'markup',
         '#markup' => t( 'Select the action to add.'),
     );
+
+	$form['event'] = array(
+		'#type' => 'item',
+		'#title' => t( 'Event : <em>@name</em>', array('@name' => $_GET['event_name'])), 
+	);
+
+	$form['rule'] = array(
+		'#type' => 'item',
+		'#title' => t( 'Rule : <em>@name</em>', array('@name' => $_GET['rule_name'])), 
+	);
 
     $form['campaign_id'] = array(
         '#type' => 'hidden',
@@ -18,11 +28,14 @@ function ocs_admin_campaign_action_form( $form, &$form_state, $campaign_id, $act
     $items = entity_load('node', FALSE, array('type' => 'ocs_actions'));
     $options = array();
     foreach( $items as $item) {
+//        dpm( $item, 'action');
         $client = taxonomy_term_load( $item->field_ocs_client_id['und'][0]['tid']);
-//        dpm( $client, 'client');
-        $options[$client->name][$item->nid] = $item->title;
+        $options[$client->name][$item->nid] = $item->field_description['und'][0]['safe_value'];
 		if ( ! isset($selected_action)) $selected_action = $item->nid;
     }
+
+    dpm( $items, 'actions');
+    dpm( $selected_action, 'selected');
 
 	$form['action_id'] = array(
 		'#type' => 'select',
@@ -44,15 +57,15 @@ function ocs_admin_campaign_action_form( $form, &$form_state, $campaign_id, $act
 		);
 
 	$action = node_load( $selected_action);
-	foreach( $action->field_ocs_param_ref['und'] as $param) {
-		$para = node_load( $param['target_id']);
+    list( $paramlist, $options, $selected) = ocs_admin_get_param_list( $action, $rule_id);
+    dpm( $paramlist, 'paramlist');
 
-		$key = $selected_action . ':' . $param['target_id'];
-		$form['param'][$key] = array(
-			'#type' => 'textfield',
-			'#title' => $para->title,
-		);
+	foreach( $action->field_ocs_param_ref['und'] as $param) {
+		$node = node_load( $param['target_id']);
+		$key = $rule_id . ':' . $param['target_id'];
+		$form['param'][$key] = ocs_admin_get_param_form( $paramlist, $key);
 	}
+	$form['#paramlist'] = $paramlist;
 
     $form['actions'] = array('#type' => 'actions');
     $form['actions']['submit'] = array(
