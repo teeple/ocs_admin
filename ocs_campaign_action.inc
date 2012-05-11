@@ -8,6 +8,7 @@ function ocs_admin_campaign_action_form( $form, &$form_state, $campaign_id, $rul
     if ( $op == 'edit') {
         $edit_action = ocs_admin_campaign_action_load( $action_id);
         if ( ! isset( $selected_action)) $selected_action = $edit_action['ocs_action_id'];
+        dpm( $edit_action, 'edit');
     }
 
     $form['#op'] = $op;
@@ -61,6 +62,7 @@ function ocs_admin_campaign_action_form( $form, &$form_state, $campaign_id, $rul
 		'#type' => 'select',
 		'#title' => t('Action to add'),
 		'#options' => $options,
+		'#default_value' => $selected_action,
 		'#description' => t('The Action shall be applied to the system.'),
 		'#ajax' => array(
 			'callback' => 'ocs_admin_ajax_action_param',
@@ -331,8 +333,6 @@ function ocs_admin_campaign_actions_load_all( $campaign_id)
     {
         $records[ $record['rule_id']][] = $record;
     }
-
-    dpm( $records, 'actions');
 
     db_set_active( 'default');
 

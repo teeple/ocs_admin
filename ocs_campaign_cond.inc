@@ -7,14 +7,18 @@ function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id, $r
 	$cond_idx = isset( $_GET['idx']) ? $_GET['idx'] : 
         (isset( $form_state['values']) ? $form_state['values']['cond_idx'] : time());
     $operator = isset( $form_state['values']) ? $form_state['values']['operator'] : NULL;
+    $direct_input = isset( $form_state['values']['direct_input']) ? $form_state['values']['direct_input'] : 1;
 
 	if ( $op == 'edit') {
 		// it's editing mode
 		$condition = ocs_admin_campaign_cond_load( $cond_id, $cond_idx);
+
 		if ( ! isset( $selected_param))
             $selected_param = $condition['rule_id'].':'.$condition['param_id'];
         if ( ! isset( $operator))
             $operator = $condition['operator'];
+        if ( ! isset( $form_state['values']['direct_input']))
+            $direct_input = $condition['direct_input'];
 	}
 
 
@@ -27,12 +31,12 @@ function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id, $r
 
 	$form['event'] = array(
 		'#type' => 'item',
-		'#title' => t( 'Event : <em>@name</em>', array('@name' => $_GET['event_name'])), 
+		'#title' => t( 'Event : <em>@name</em>', array('@name' => strip_tags($_GET['event_name']))), 
 	);
 
 	$form['rule'] = array(
 		'#type' => 'item',
-		'#title' => t( 'Rule : <em>@name</em>', array('@name' => $_GET['rule_name'])), 
+		'#title' => t( 'Rule : <em>@name</em>', array('@name' => strip_tags($_GET['rule_name']))), 
 	);
 
 	$rule = &drupal_static( __FUNCTION__ . 'rule', array());
@@ -62,7 +66,7 @@ function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id, $r
 
         list( $paramlist, $options, $selected) = ocs_admin_get_param_list( $node, $rule_id);
         if ( ! isset( $selected_param)) $selected_param = $selected;
-        dpm( $paramlist, 'paramlist');
+//        dpm( $paramlist, 'paramlist');
 	}
 
 //    dpm( $paramlist, 'param list');
@@ -129,10 +133,10 @@ function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id, $r
         '#attributes' => array('class' => array( 'borderless'), 'style' => 'width:40%'),
     );
 
-    $direct_input =  isset( $form_state['values']['value_type']) ? $form_state['values']['value_type'] : 1;
-    $form['container']['valueset']['value_type'] = array(
+    $form['container']['valueset']['direct_input'] = array(
         '#type' => 'checkbox',
         '#title' => 'Input direct value',
+//        '#default_value' => $direct_input,
         '#default_value' => $direct_input,
         '#ajax' => array(
             'callback' => 'ocs_admin_ajax_value_type',
@@ -141,19 +145,18 @@ function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id, $r
     );
 
 
-    if ( $direct_input ) {
+    $form['container']['valueset']['value2'] = array(
+        '#type' => 'hidden',
+    );
+
+//    dpm( $direct_input, 'dir input');
+    if ( ! empty($direct_input) || $operator == 'between' ) {
         $form['container']['valueset']['value'] = ocs_admin_get_param_form( $paramlist, $selected_param, $operator);
 
         if ( $operator == 'between') {
             $form['container']['valueset']['value2'] = $form['container']['valueset']['value'];
             unset( $form['container']['valueset']['value2']['#title']);
         }
-        else {
-            $form['container']['valueset']['value2'] = array(
-                '#type' => 'hidden',
-            );
-        }
-
         if ( isset($condition))  {
             if ( $form['container']['valueset']['value']['#type'] = 'textfield') {
                 $form['container']['valueset']['value']['#default_value'] = $condition['value'];
@@ -174,11 +177,14 @@ function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id, $r
     }
     else {
         $counters = ocs_admin_get_counter_name_list();
-        $form['container']['valueset']['value_list'] = array(
+        $form['container']['valueset']['value'] = array(
             '#type' => 'select',
             '#title' => 'Customer\'s Account Balance',
             '#options' => $counters,
         );
+        if ( isset($condition))  {
+            $form['container']['valueset']['value']['#default_value'] = $condition['value'];
+        }
     }
 
 	$form['actions'] = array( 
@@ -218,12 +224,13 @@ function ocs_admin_get_counter_name_list()
 function ocs_admin_get_param_form( $paramlist, $param, $operator = NULL)
 {
     $type = _get_param_type( $paramlist, $param);
+    $title = isset( $paramlist[$param.':title']) ? $paramlist[$param.':title'] : 'Value';
 
     if ($type == OCS_PARAM_TYPE_ENUM) {
         $options = array_flip( $paramlist[$param.':enum']);
         $form = array(
             '#type' => ($operator == 'in list') ? 'checkboxes' : 'radios',
-            '#title' => $paramlist[$param.':title'],
+            '#title' => $title,
             '#options' => $options,
         );
     }
@@ -231,14 +238,14 @@ function ocs_admin_get_param_form( $paramlist, $param, $operator = NULL)
         $counters = ocs_admin_get_counter_name_list();
         $form = array(
             '#type' => 'select',
-            '#title' => $paramlist[$param.':title'],
+            '#title' => $title,
             '#options' => $counters,
         );
     }
     else {
         $form = array(
             '#type' => 'textfield',
-            '#title' => $paramlist[$param.':title'],
+            '#title' => $title,
             '#size' => 30,
         );
     }
@@ -350,56 +357,67 @@ function ocs_admin_campaign_add_cond_form_validate( $form, &$form_state)
 {
     $values = $form_state['values'];
 //    dpm( $values, 'form state');
-    if ( $values['value_type']) {
+    if ( $values['direct_input']) {
         // direct input
 
         $type = _get_param_type( $form['#paramlist'], $values['param']);
+        $msg = ocs_admin_check_param_value( $type, $values['value']);
+        if ( ! empty( $msg)) {
+            form_set_error( 'value', $msg);
+        }
 
-        foreach( array( 'value', 'value2') as $key) {
-            if ( ! isset( $values[$key])) continue;
-
-            $value = $values[$key];
-            $t_arg = array( '%v' => $value);
-            switch( $type) {
-                case OCS_PARAM_TYPE_INTEGER:
-                case OCS_PARAM_TYPE_ACCOUNT_KEY:    // digits
-                    if ( ! is_numeric($value)) {
-                        form_set_error( $key, t('Invalid value "%v". Must be numeric.', $t_arg));
-                    }
-                    break;
-                case OCS_PARAM_TYPE_DATE:   // yyyyMMdd, MMdd
-                    $length = strlen( $value);
-                    if ( ! is_numeric($value) || !($length == 4 || $length == 8)) {
-                        form_set_error( $key, t('Invalid date value "%v". Must be in "yyyyMMdd" format.', $t_arg));
-                    }
-                    $year = ($length == 8) ? substr( $value, 0, 4) : date('Y');
-                    $month = substr( $value, -4, 2);
-                    $day = substr( $value, -2);
-                    if ( ! checkdate( $month, $day, $year)) {
-                        $t_arg['%year'] = $year;
-                        $t_arg['%mon'] = $month;
-                        $t_arg['%day'] = $day;
-                        form_set_error( $key, t('Invalid date value "%v":%year-%mon-%day. Must be in "yyyyMMdd" format.', $t_arg));
-                    }
-
-                    break;
-                case OCS_PARAM_TYPE_TIME:   // HHMM
-                    if ( ! is_numeric($value) || $value < 0 || $value > 2400) {
-                        form_set_error( $key, t('Invalid time value "%v", Must be in "HHMM" format.', $t_arg));
-                    }
-                    break;
-
-                case OCS_PARAM_TYPE_STRING:
-                    $length = strlen( $value);
-                    if ( $length == 0) form_set_error( 'value', t('Value cannot be empty.'));
-                    break;
-
-                case OCS_PARAM_TYPE_ENUM:
-                    break;
+        if ( $form['container']['valueset']['value2']['#type'] != 'hidden') {
+            $msg = ocs_admin_check_param_value( $type, $values['value2']);
+            if ( ! empty( $msg)) {
+                form_set_error( 'value2', $msg);
             }
         }
     }
 
+}
+
+function ocs_admin_check_param_value( $type, $value)
+{
+    $t_arg = array( '%v' => $value);
+    switch( $type) {
+        case OCS_PARAM_TYPE_INTEGER:
+        case OCS_PARAM_TYPE_ACCOUNT_KEY:    // digits
+            if ( ! is_numeric($value)) {
+                return t('Invalid value "%v". Must be numeric.', $t_arg);
+            }
+            break;
+        case OCS_PARAM_TYPE_DATE:   // yyyyMMdd, MMdd
+            $length = strlen( $value);
+            if ( ! is_numeric($value) || !($length == 4 || $length == 8)) {
+                return t('Invalid date value "%v". Must be in "yyyyMMdd" format.', $t_arg);
+            }
+            $year = ($length == 8) ? substr( $value, 0, 4) : date('Y');
+            $month = substr( $value, -4, 2);
+            $day = substr( $value, -2);
+            if ( ! checkdate( $month, $day, $year)) {
+                $t_arg['%year'] = $year;
+                $t_arg['%mon'] = $month;
+                $t_arg['%day'] = $day;
+                return t('Invalid date value "%v":%year-%mon-%day. Must be in "yyyyMMdd" format.', $t_arg);
+            }
+
+            break;
+        case OCS_PARAM_TYPE_TIME:   // HHMM
+            if ( ! is_numeric($value) || $value < 0 || $value > 2400) {
+                return t('Invalid time value "%v", Must be in "HHMM" format.', $t_arg);
+            }
+            break;
+
+        case OCS_PARAM_TYPE_STRING:
+            $length = strlen( $value);
+            if ( $length == 0) return t('Value cannot be empty.');
+            break;
+
+        case OCS_PARAM_TYPE_ENUM:
+            break;
+    }
+
+    return NULL;
 }
 
 function ocs_admin_campaign_add_cond_form_submit( $form, &$form_state)
@@ -417,8 +435,14 @@ function ocs_admin_campaign_add_cond_form_submit( $form, &$form_state)
 			'param_id' => $list[1] . (isset($list[2]) ? ':'.$list[2] : ''),
 			'param_name' => $form['#paramlist'][ $values['param']],
 			'operator' => $values['operator'],
+			'direct_input' => $values['direct_input'],
 			'value' => $value1,
 			'value2' => $value2,
+            'cond_rule' => t('@para @op @value @value2', array(
+					'@para' =>  $form['#paramlist'][ $values['param']],
+					'@op' => $values['operator'],
+					'@value' => $value1,
+                    '@value2' => ($values['operator'] == 'between') ? ', '. $value2 : '')),
 			'cond_name' => t( '@counter @para @op @value @value2', array( 
                     '@counter' => isset($values['counter']) ? $values['counter'] : '',
 					'@para' =>  $form['#paramlist'][ $values['param']],
@@ -504,7 +528,7 @@ function ocs_admin_campaign_condition_add( $cond)
 
 function ocs_admin_campaign_cond_delete_confirm( $form, &$form_state, $campaign_id, $rule_id, $cond_id)
 {
-	$cond_name = isset( $_GET['name']) ? $_GET['name'] : 'Condition ID:' . $cond_id;
+	$cond_name = isset( $_GET['name']) ? strip_tags($_GET['name']) : 'Condition ID:' . $cond_id;
 
     $form['#campaign_id'] = $campaign_id;
     $form['#rule_id'] = $rule_id;
@@ -512,9 +536,9 @@ function ocs_admin_campaign_cond_delete_confirm( $form, &$form_state, $campaign_
     $form['#cond_name'] = $cond_name;
     $form['#cond_idx'] = isset( $_GET['idx']) ? $_GET['idx'] : '0';
 
-    $caption = t('<p><strong>Warning:</strong> %name of the Rule %id will be deleted from the Campaign.</p>',
-        array( '%id' => $rule_id, '%name' => ($cond_id == 0) ? t('All the conditions') : 
-            t( 'The condition "%key"', array( '%key' => $cond_name))));
+    $caption = t('<p><strong>Warning:</strong> @name of the Rule @id will be deleted from the Campaign.</p>',
+        array( '@id' => $rule_id, '@name' => ($cond_id == 0) ? t('All the conditions') : 
+            t( 'The condition "@key"', array( '@key' => $cond_name))));
 
     $caption .= '<p>'. t('This action cannot be undone.') . '</p>';
 
@@ -630,7 +654,7 @@ function ocs_admin_add_campaign_rule_form( $form, &$form_state, $campaign_id, $e
 
 	$form['event'] = array(
 		'#type' => 'item',
-		'#title' => t( 'Event : <em>@name</em>', array('@name' => $_GET['event_name'])), 
+		'#title' => t( 'Event : <em>@name</em>', array('@name' => strip_tags($_GET['event_name']))), 
 	);
 
     $form['rule_name'] = array(
@@ -716,8 +740,6 @@ function ocs_admin_campaign_conditions_load_all( $campaign_id)
     {
         $records[ $record['rule_id']][] = $record;
     }
-
-    dpm( $records, 'conditions');
 
     db_set_active( 'default');
 

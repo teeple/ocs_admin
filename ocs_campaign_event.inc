@@ -71,7 +71,7 @@ function ocs_admin_campaign_event_form_submit( $form, &$form_state)
 /*
     get condition list
 */
-function ocs_admin_campaign_events_load_all( $campaign_id)
+function ocs_admin_campaign_events_load_all( $campaign_id, $key = 'rule_id')
 {
     db_set_active('ocsdb');
 
@@ -79,13 +79,17 @@ function ocs_admin_campaign_events_load_all( $campaign_id)
     $query = db_select( 'ocs_campaign_rules', 'c');
     $result = $query->condition( 'c.campaign_id', $campaign_id, '=')
         ->fields( 'c')
-        ->execute()
-        ->fetchAllAssoc( 'rule_id', PDO::FETCH_ASSOC);
-    
+        ->execute();
+
+    $records = array();
+    while( $record = $result->fetchAssoc())
+    {
+        $records[ $record[$key]][] = $record;
+    }
 
     db_set_active( 'default');
 
-    return $result;
+    return $records;
 }
 
 /*

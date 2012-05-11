@@ -493,6 +493,11 @@ function ocs_admin_table_group()
         'help' => t('Master Number'),
     ));
 
+    $data['ocs_group']['limit_usage'] = _get_numeric_field( array(
+        'title' => t('Group Limit Usage'),
+        'help' => t('Group Limit Usage'),
+    ));
+
     return $data;
 }
 

@@ -3,64 +3,7 @@
 module_load_include( 'inc', 'ocs_admin', 'ocs_campaign_action');
 module_load_include( 'inc', 'ocs_admin', 'ocs_campaign_event');
 module_load_include( 'inc', 'ocs_admin', 'ocs_campaign_cond');
-
-/*
-** campaign list
-*/
-function ocs_admin_campaign_overview() 
-{
-    $result = array(
-        array( 'title' => 'First call campaign',
-            'description' => 'Give bonus when a user makes a first call',
-            'campaign_name' => 'first_call_1',
-            'campaign_id' => '1',
-            ),
-        array( 'title' => 'Recharge bonus campaign',
-            'description' => 'Give 100 SMS for 3 consequent recharges',
-            'campaign_name' => 'rechrage_1',
-            'campaign_id' => '2',
-            ),
-    );
-
-    $header = array( t('Campaign'), array('data' => t('Operations'), 'colspan' => '3'));
-    $rows = array();
-    foreach( $result as $item) {
-        $row = array( theme( 'ocs_admin_group_overview', 
-            array( 'title' => $item['title'],
-                'name' => $item['campaign_name'],
-                'description' => $item['description'])));
-        $row[] = array( 'data' => l(t('edit'), 'ocs_admin/campaign/'. $item['campaign_id'] . '/edit'), 
-            'class' => 'operation-list');
-        $row[] = array( 'data' => l(t('rules'), 'ocs_admin/campaign/'. $item['campaign_id'] . '/rule'), 
-            'class' => 'operation-list');
-        $row[] = array( 'data' => l(t('disable'), 'ocs_admin/campaign/'. $item['campaign_id'] . '/disable'), 
-            'class' => 'operation-list');
-        $rows[] = $row;
-    }
-
-    return array(
-        'active' => array(
-            '#markup' => '<h3>Active Campaigns</h3>'.
-                theme( 'table', array( 'header' => $header, 'rows' => $rows)),
-            ),
-         'inactive' => array(
-            '#markup' => '<br><h3>Inactive Campaigns</h3>'.
-                theme( 'table', array( 'header' => $header, 'rows' => $rows)),
-            ),
-    );
-}
-
-function ocs_admin_campaign_rule_page( $campaign_id)
-{ 
-    $form = drupal_get_form( 'ocs_admin_campaign_rule_form', $campaign_id);
-    $page = array(
-         'rule' => array(
-            '#markup' => drupal_render( $form),
-            ),
-    );
-
-    return $page;
-}
+module_load_include( 'inc', 'ocs_admin', 'ocs_campaign_export');
 
 /*
 ** campaign rules form
@@ -82,7 +25,8 @@ function ocs_admin_campaign_rule_form( $form, &$form_state, $campaign_id = NULL)
     $actions = ocs_admin_campaign_actions_load_all( $campaign_id);
     dpm( $events, 'all event list');
 
-	foreach( $events as $rule_id => $rule) {
+	foreach( $events as $rule_id => $rules) {
+        $rule = $rules[0];
         $event_id = $rule['event_id'];
         if ( ! isset( $form['#event'][$event_id])) {
             // add new event
@@ -204,9 +148,9 @@ function ocs_admin_campaign_rule_form( $form, &$form_state, $campaign_id = NULL)
                 $cond_id = $cond['cond_id'];
                 $t_arg['@cond'] = $cond_id;
                 $q_arg['query']['name'] = $cond['cond_name'];
-                $q_arg['query']['idx'] = $cond['cond_idx'];
 
                 $operations = array();
+                // 'cond_idx' value must not be passed to 'Add AND' link
                 $operations['add'] = array( 
                     '#type' => 'link',
                     '#title' => t('Add AND'),
@@ -214,6 +158,8 @@ function ocs_admin_campaign_rule_form( $form, &$form_state, $campaign_id = NULL)
                     '#options' => $q_arg,
                 );
 
+                // 'cond_idx' value must not be passed to 'Add AND' link
+                $q_arg['query']['idx'] = $cond['cond_idx'];
                 $operations['delete'] = array( 
                     '#type' => 'link',
                     '#title' => t('Delete'),
@@ -302,18 +248,7 @@ function ocs_admin_campaign_rule_form( $form, &$form_state, $campaign_id = NULL)
                                 array( '@campaign' => $campaign_id)))));
 	$form['#no_rule'] = t('There are no rules yet. ');
 
-
-  //****************************
-  // submit buttons for condition tree
-  //****************************
-
-  $form['actions'] = array('#type' => 'actions');
-  $form['actions']['submit'] = array(
-    '#type' => 'submit',
-    '#value' => t('Save Conditions'),
-    );
-
-   return $form;
+    return $form;
 }
 
 
