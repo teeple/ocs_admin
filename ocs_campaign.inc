@@ -192,7 +192,7 @@ function ocs_admin_campaign_rule_form( $form, &$form_state, $campaign_id = NULL)
                 '#options' => $q_arg,
             );
 
-            $form['#rule'][$rule_id]['operations'] = $operations;
+            $form['#rule'][$rule_id]['cond_operations'] = $operations;
             $form['#rule'][$rule_id]['#no_cond'] = count( $conditions[$rule_id]);
 
             foreach( $conditions[$rule_id] as $cond) {
@@ -238,24 +238,55 @@ function ocs_admin_campaign_rule_form( $form, &$form_state, $campaign_id = NULL)
 
         // add actions
         if ( isset( $actions[$rule_id])) {
+            unset( $q_arg['query']['name']);
+            unset( $q_arg['query']['idx']);
+
+            // add operations for 'Action'
+            $operations = array();
+            $operations['add'] = array( 
+                '#type' => 'link',
+                '#title' => t('Add'),
+                '#href' => t( 'ocs_admin/campaign/@campaign/rule/@rule/action/add', $t_arg),
+                '#options' => $q_arg,
+            );
+
+            $operations['delete'] = array( 
+                '#type' => 'link',
+                '#title' => t('Delete All'),
+                '#href' => t( 'ocs_admin/campaign/@campaign/rule/@rule/action/0/delete', $t_arg),
+                '#options' => $q_arg,
+            );
+
+            $form['#rule'][$rule_id]['action_operations'] = $operations;
+
             foreach( $actions[$rule_id] as $action) {
                 $info = array(
                     '#type' => 'item',
-                    '#title' => 'action',
+                    '#title' => $action['action_name'],
                 );
+
+                $t_arg['@action'] = $action['action_id'];
+                $q_arg['query']['name'] = $action['action_name'];
 
                 $operations = array();
 
                 $operations['add'] = array( 
-                    '#type' => 'link',
-                    '#title' => t('Add'),
-                    '#href' => t( 'ocs_admin/campaign/@campaign/rule/add', $t_arg),
+                    '#type' => 'item',
+                    '#value' => '',
                 );
 
                 $operations['delete'] = array( 
-                  '#type' => 'link',
-                  '#title' => t('Delete'),
-                  '#href' => t( 'ocs_admin/campaign/@campaign/rule/@rule/delete', $t_arg),
+                    '#type' => 'link',
+                    '#title' => t('Delete'),
+                    '#href' => t( 'ocs_admin/campaign/@campaign/rule/@rule/action/@action/delete', $t_arg),
+                    '#options' => $q_arg,
+                  );
+
+                $operations['edit'] = array( 
+                    '#type' => 'link',
+                    '#title' => t('Edit'),
+                    '#href' => t( 'ocs_admin/campaign/@campaign/rule/@rule/action/@action/edit', $t_arg),
+                    '#options' => $q_arg,
                   );
 
                 $action_id = $action['action_id'];
@@ -520,7 +551,8 @@ function ocs_admin_campaign_rule_theme( $form)
 	  if (empty($rows)) {
 		$rows[] = array(array('data' => $form['#empty_text'], 'colspan' => '7'));
 	  }
-	  $footer = ( isset($form['#footer'])) ?  array(array('data' => $form['#footer'], 'colspan' => '7')) : NULL;
+	  $footer = array(array('data' => isset($form['#footer']) ? $form['#footer'] : '', 
+        'colspan' => '7', 'class' => array( 'bd-top')));
 
 	  $output = '<br>';
 	  if ( isset( $form['#caption'])) {
@@ -579,7 +611,7 @@ function _get_condition_rows( $form, $rule_id, $event_name)
               $row = array(
                     $white_cell,
                     array( 'data' => 'Conditions (OR)', 'colspan' => '2', ));
-              $row = array_merge( $row, _operation_list( $form['#rule'][$rule_id]['operations']));
+              $row = array_merge( $row, _operation_list( $form['#rule'][$rule_id]['cond_operations']));
               $rows[] = $row;
           }
 
@@ -618,19 +650,20 @@ function _get_action_rows( $form, $rule_id, $event_name)
     // add actions
     $idx = 0;
     foreach( $form['#rule'][$rule_id]['action'] as $action_id => $action) {
-      $operations = theme_action_list( $action['operations']);
+        if ( $idx ++ == 0) {
+            $row = array(
+                $white_cell,
+                array( 'data' => 'Actions', 'colspan' => '2', 'class' => array('bd-top')));
+            $row = array_merge( $row, _operation_list( $form['#rule'][$rule_id]['action_operations']));
+            $rows[] = $row;
+        }
 
-      if ( $idx ++ == 0) {
-          $row = array(
-            $white_cell,
-            array( 'data' => 'Actions'. $operations, 'colspan' => '2', 'class' => array('bd-top')));
-          $row = array_merge( $row, _operation_list( $cond['operations']));
-          $rows[] = $row;
-      }
-      $row = array(
-        $white_cell,
-        array( 'data' => $action['info']));
-      $rows[] = $row;
+        $row = array();
+        $row[] = $white_cell;
+        $row[] = $white_cell;
+        $row[] = array( 'data' => $action['info']);
+        $row = array_merge( $row, _operation_list( $action['operations']));
+        $rows[] = $row;
     }
 
     if ( $no_action == 0) {

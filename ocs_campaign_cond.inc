@@ -63,14 +63,6 @@ function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id, $r
         list( $paramlist, $options, $selected) = ocs_admin_get_param_list( $node, $rule_id);
         if ( ! isset( $selected_param)) $selected_param = $selected;
         dpm( $paramlist, 'paramlist');
-
-		// get counter name list
-		module_load_include( 'inc', 'ocs_admin', 'ocs_counter');
-		$counter_list = ocs_admin_counter_name_load_all();
-		$counters = array();
-		foreach( $counter_list as $value) {
-			$counters[ $value['counter_name']] = $value['counter_name'];
-		}
 	}
 
 //    dpm( $paramlist, 'param list');
@@ -110,6 +102,7 @@ function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id, $r
     );
 
     if ( substr( $selected_param, -7) == 'account') {
+        $counters = ocs_admin_get_counter_name_list();
         $form['container']['param']['counter'] = array(
             '#type' => 'select',
             '#title' => t('Counter'),
@@ -162,7 +155,11 @@ function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id, $r
         }
 
         if ( isset($condition))  {
-            if ($type == OCS_PARAM_TYPE_ENUM) {
+            if ( $form['container']['valueset']['value']['#type'] = 'textfield') {
+                $form['container']['valueset']['value']['#default_value'] = $condition['value'];
+                $form['container']['valueset']['value2']['#default_value'] = $condition['value2'];
+            }
+            else {
                 $json = json_decode( $condition['value'], TRUE);
                 dpm( $json, 'json');
                 if ( $operator == 'in list') {
@@ -173,13 +170,10 @@ function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id, $r
                     $form['container']['valueset']['value']['#default_value'] = $v[0];
                 }
             }
-            else {
-                $form['container']['valueset']['value']['#default_value'] = $condition['value'];
-                $form['container']['valueset']['value2']['#default_value'] = $condition['value2'];
-            }
         }
     }
     else {
+        $counters = ocs_admin_get_counter_name_list();
         $form['container']['valueset']['value_list'] = array(
             '#type' => 'select',
             '#title' => 'Customer\'s Account Balance',
@@ -206,6 +200,21 @@ function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id, $r
 	return $form;
 }
 
+function ocs_admin_get_counter_name_list()
+{
+	$counters = &drupal_static( __FUNCTION__, array());
+	if ( empty( $counters)) {
+        // get counter name list
+        module_load_include( 'inc', 'ocs_admin', 'ocs_counter');
+        $counter_list = ocs_admin_counter_name_load_all();
+        foreach( $counter_list as $value) {
+            $counters[ $value['counter_name']] = $value['counter_name'];
+        }
+    }
+
+    return $counters;
+}
+
 function ocs_admin_get_param_form( $paramlist, $param, $operator = NULL)
 {
     $type = _get_param_type( $paramlist, $param);
@@ -216,6 +225,14 @@ function ocs_admin_get_param_form( $paramlist, $param, $operator = NULL)
             '#type' => ($operator == 'in list') ? 'checkboxes' : 'radios',
             '#title' => $paramlist[$param.':title'],
             '#options' => $options,
+        );
+    }
+    else if ( $type == OCS_PARAM_TYPE_COUNTER) {
+        $counters = ocs_admin_get_counter_name_list();
+        $form = array(
+            '#type' => 'select',
+            '#title' => $paramlist[$param.':title'],
+            '#options' => $counters,
         );
     }
     else {
