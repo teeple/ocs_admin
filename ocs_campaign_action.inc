@@ -343,7 +343,6 @@ function ocs_admin_campaign_action_load( $action_id)
 {
     db_set_active('ocsdb');
 
-    // get group information
     $query = db_select( 'ocs_campaign_actions', 'c');
     $result = $query->condition( 'c.action_id', $action_id, '=')
         ->fields( 'c')
@@ -358,6 +357,21 @@ function ocs_admin_campaign_action_load( $action_id)
 
     $result['param'] = $param;
     dpm( $result, 'action');
+
+    db_set_active( 'default');
+
+    return $result;
+}
+
+function ocs_admin_campaign_action_param_load( $action_id)
+{
+    db_set_active('ocsdb');
+
+    $result = db_select( 'ocs_campaign_action_param', 'c')
+        ->condition( 'c.action_id', $action_id, '=')
+        ->fields( 'c')
+        ->execute()
+        ->fetchAllAssoc( 'param_id', PDO::FETCH_ASSOC);
 
     db_set_active( 'default');
 

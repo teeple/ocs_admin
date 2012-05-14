@@ -152,13 +152,14 @@ function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id, $r
 //    dpm( $direct_input, 'dir input');
     if ( ! empty($direct_input) || $operator == 'between' ) {
         $form['container']['valueset']['value'] = ocs_admin_get_param_form( $paramlist, $selected_param, $operator);
+        dpm( $form['container']['valueset']['value'], 'direct input');
 
         if ( $operator == 'between') {
             $form['container']['valueset']['value2'] = $form['container']['valueset']['value'];
             unset( $form['container']['valueset']['value2']['#title']);
         }
         if ( isset($condition))  {
-            if ( $form['container']['valueset']['value']['#type'] = 'textfield') {
+            if ( $form['container']['valueset']['value']['#type'] == 'textfield') {
                 $form['container']['valueset']['value']['#default_value'] = $condition['value'];
                 $form['container']['valueset']['value2']['#default_value'] = $condition['value2'];
             }
@@ -327,8 +328,8 @@ function _campaign_operator( $paramlist, $selected)
 
 function _get_param_type( $paramlist, $selected)
 {
-//    dpm( $selected, 'get_param');
 	$list = explode( ':', $selected);       // event:param:account or action:param:account
+
     if ( substr( $selected, -7) == 'account') {
         return OCS_PARAM_TYPE_ACCOUNT_KEY;
     }
@@ -438,11 +439,11 @@ function ocs_admin_campaign_add_cond_form_submit( $form, &$form_state)
 			'direct_input' => $values['direct_input'],
 			'value' => $value1,
 			'value2' => $value2,
-            'cond_rule' => t('@para @op @value @value2', array(
-					'@para' =>  $form['#paramlist'][ $values['param']],
-					'@op' => $values['operator'],
-					'@value' => $value1,
-                    '@value2' => ($values['operator'] == 'between') ? ', '. $value2 : '')),
+            'cond_rule' => t('@para !op @value @value2', array(
+					'@para' =>  _get_param_name( $form['#paramlist'], $values['param'], $values['counter']),
+					'!op' => $values['operator'],
+					'@value' => $values['value'],
+                    '@value2' => ($values['operator'] == 'between') ? ', '. $values['value2'] : '')),
 			'cond_name' => t( '@counter @para @op @value @value2', array( 
                     '@counter' => isset($values['counter']) ? $values['counter'] : '',
 					'@para' =>  $form['#paramlist'][ $values['param']],
@@ -459,6 +460,17 @@ function ocs_admin_campaign_add_cond_form_submit( $form, &$form_state)
 
 	$form_state['redirect'] = 'ocs_admin/campaign/' . $form['#campaign_id'] . '/rule';
 }
+
+function _get_param_name( $paramlist, $param, $counter)
+{
+    $type = _get_param_type( $paramlist, $param);
+    if ( $type == OCS_PARAM_TYPE_ACCOUNT_KEY) {
+        return $counter;
+    }
+
+    return $paramlist[ $param];
+}
+
 
 function _get_param_value( $paramlist, $param, $value)
 {

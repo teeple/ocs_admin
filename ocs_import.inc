@@ -59,6 +59,7 @@ function ocs_admin_import_ocs_config( $form, &$form_state, $local_file = NULL)
         $form['file_content'] = array(
             '#type' => 'textarea',
             '#title' => 'Event File Contents',
+            '#rows' => 20,
             '#default_value' => $file_content,
         );
 
@@ -240,6 +241,11 @@ function update_ocs_events( $events)
         {"desc":"Account status has changed",
         "param":["OCS_PARAM.CALLING","OCS_PARAM.CALLED","OCS_PARAM.CALL_TYPE"],
         "id":2},
+    {"OCS_FIRST_CALL":
+        {"desc":"The subscriber makes the first call",
+        "param":["calling","called","product","create_date","active_date","week","fullday","time"],
+        "property":{"service_id":"PC_EVENT"},
+        "id":1},
     ...
     */
 
@@ -260,6 +266,7 @@ function update_ocs_events( $events)
         $node->field_ocs_event_export['und'][0]['value'] = 0;
         $node->field_ocs_event_id['und'][0]['value'] = $event_info['id'];
         $node->field_description['und'][0]['value'] = $event_info['desc'];
+        $node->field_property['und'][0]['value'] = isset( $event_info['property']) ? json_encode($event_info['property']) : '';
 
         unset( $node->field_ocs_param_ref['und']);
         foreach( $event_info['param'] as $name) {

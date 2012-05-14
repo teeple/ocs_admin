@@ -70,6 +70,10 @@ function ocs_admin_campaign_rule_form( $form, &$form_state, $campaign_id = NULL)
               '#options' => $q_arg,
               );
 
+            $operations['edit'] = array( 
+                '#type' => 'item',
+            );
+
             $form['#event'][$event_id]['operations'] = $operations;
         }
 
@@ -134,6 +138,10 @@ function ocs_admin_campaign_rule_form( $form, &$form_state, $campaign_id = NULL)
                 '#title' => t('Delete OR'),
                 '#href' => t( 'ocs_admin/campaign/@campaign/rule/@rule/cond/0/delete', $t_arg),
                 '#options' => $q_arg,
+            );
+
+            $operations['edit'] = array( 
+                '#type' => 'item',
             );
 
             $form['#rule'][$rule_id]['cond_operations'] = $operations;
@@ -468,7 +476,7 @@ function ocs_admin_campaign_rule_theme( $form)
               $row[] = array( 'data' => t('Rule @id : @name', 
                 array( '@id' => $rule_id, '@name' => $rule['info']['rule_name'])),
                 'colspan' => '3', 'class' => array( 'bd-top'));
-              $row = array_merge( $row, _operation_list( $rule['operations']));
+              $row = array_merge( $row, _operation_list( $rule['operations'], array( 'bd-top')));
               $rows[] = $row;
 
               // add conditions
@@ -520,12 +528,12 @@ function theme_action_list( $list)
     return $output;
 }
 
-function _operation_list( $list)
+function _operation_list( $list, $class = array())
 {
     $operations = array();
     foreach( element_children( $list) as $op) {
       $operations[] = array( 'data' => drupal_render($list[$op]),
-        'class' => array('menu-operations'));
+        'class' => array_merge( array('menu-operations'), $class));
     }
 
     return $operations;
@@ -608,7 +616,9 @@ function _get_action_rows( $form, $rule_id, $event_name)
             $white_cell,
             array('data' => 'Actions', 'class' => array('bd-top', 'dotted')),
             array('data' => $form['#rule'][$rule_id]['#empty_action_text'],
-                'class' => array( 'bd-top', 'dotted')));
+                'class' => array( 'bd-top', 'dotted')),
+            array( 'data' => '', 'colspan' => '3'),
+                );
     }
 
     return $rows;
