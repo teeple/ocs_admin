@@ -297,6 +297,7 @@ function ocs_admin_account_add_form_wizard( $form, &$form_state, $arg = NULL)
         '#type' => 'textfield',
         '#title' => t('Customer ID'),
         '#size' => '30',
+        '#attributes' => array( 'class' => array( 'column')),
     );
 
     $form['section']['customer']['customer_name'] = array(

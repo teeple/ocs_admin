@@ -55,7 +55,6 @@ function theme_ocs_admin_group_overview( $variables)
 function ocs_admin_group_edit_form( $form, &$form_state, $type, $groupid = NULL)
 {
     if ( isset( $groupid)) $group = group_load( $groupid);
- 
     $form = array();
     $form['section'] = array(
         '#type' => 'fieldset',
@@ -124,19 +123,39 @@ function ocs_admin_group_edit_form( $form, &$form_state, $type, $groupid = NULL)
             '#size' => 30,
         );
 
-        $form['section']['discount']['period'] = array(
-            '#type' => 'fieldset',
-            '#title' => 'Discount Time Period',
+        $hour = array();
+            for( $i = 0; $i < 24; $i++){
+                $hour[$i] = str_pad($i, 2, '0', STR_PAD_LEFT);
+        }
+
+        $min = array();
+            for( $i = 0; $i < 60; $i++){
+                $min[$i] = str_pad($i, 2, '0', STR_PAD_LEFT);
+        }
+
+        $form['section']['discount']['from_hour'] = array(
+            '#type' => 'select',//'select', 
+            '#title' => t('Discount Start Time'),
+            '#attributes' => array( 'class' => array( 'column')),
+            '#options' => $hour,
         );
 
-        $form['section']['discount']['period']['from_time'] = array(
+        $form['section']['discount']['from_min'] = array(
             '#type' => 'select', 
-            '#title' => t('Start Time'),
+            '#title_display' => 'invisible',
+            '#options' => $min,
+        );
+
+        $form['section']['discount']['to_hour'] = array(
+            '#type' => 'select',//'select', 
+            '#title' => t('Discount End Time'),
+            '#attributes' => array( 'class' => array( 'column')),
+            '#options' => $hour,
         );
  
-        $form['section']['discount']['period']['to_time'] = array(
+        $form['section']['discount']['to_min'] = array(
             '#type' => 'select', 
-            '#title' => t('End Time'),
+            '#options' => $min,
         );
     }
 
@@ -158,11 +177,15 @@ function ocs_admin_group_edit_form( $form, &$form_state, $type, $groupid = NULL)
         $form['section']['group']['group_name']['#default_value'] = $group['group_name'];
         $form['section']['group']['master_number']['#default_value'] = $group['master_number'];
         $form['section']['discount']['limit_usage']['#default_value'] = $group['limit_usage'];
+        $form['section']['discount']['from_hour']['#default_value'] = (int)substr($group['from_time'], 0, 2);
+        $form['section']['discount']['from_min']['#default_value'] = (int)substr($group['from_time'], 2, 2);
+        $form['section']['discount']['to_hour']['#default_value'] = (int)substr($group['to_time'], 0, 2);
+        $form['section']['discount']['to_min']['#default_value'] = (int)substr($group['to_time'], 2, 2);
         $_SESSION['form_mode'] = 'M';
         $_SESSION['group_name'] = $group['group_name'];
         $_SESSION['limt_usage'] = $group['limit_usage'];
     }
-    
+   
     return $form;
 }
 
@@ -792,13 +815,16 @@ function ocs_admin_member_delete_confirm_submit( $form, &$form_state)
 }
 
 
-
 /*
     save OCS Customer Group
 */
 function ocs_admin_group_save( $group)
 {
     db_set_active( 'ocsdb');
+    $from_time = str_pad($group['from_hour'], 2, '0', STR_PAD_LEFT) . 
+                 str_pad($group['from_min'], 2, '0', STR_PAD_LEFT);
+    $to_time = str_pad($group['to_hour'], 2, '0', STR_PAD_LEFT) . 
+               str_pad($group['to_min'], 2, '0', STR_PAD_LEFT);
     $fields = array( 
         'group_id' => isset($group['group_id']) ? $group['group_id'] : NULL,
         'ancestor_group_id' => isset($group['ancestor_group_id']) ? $group['ancestor_group_id'] : 0,
@@ -808,6 +834,8 @@ function ocs_admin_group_save( $group)
         'group_type' => isset($group['group_type']) ? $group['group_type'] : 0,
         'member_count' => isset($group['member_count']) ? $group['member_count'] : 0,
         'limit_usage' => isset($group['limit_usage']) ? $group['limit_usage'] : 0,
+        'from_time' => $from_time,
+        'to_time' => $to_time,
         );
     if ( isset( $group['master_number']))
         $fields['master_number'] = $group['master_number'];
@@ -1290,13 +1318,13 @@ function ocs_admin_group_select($impl, $js=NULL, $type='group', $id=NULL)
 function ocs_admin_group_add_page( $impl = NULL, $arg = NULL, $init = TRUE)
 {
     $impl = '_wizard';
-    
-    if (! isset($_SESSION['ocs_admin_group_save'])) {
-        $_SESSION['ocs_admin_group_save'] = array();
+// ocs_admin_group_save    
+    if (! isset($_SESSION['ocs_admin_group_add'])) {
+        $_SESSION['ocs_admin_group_add'] = array();
     }
-    $_SESSION['ocs_admin_group_save'] = array_merge($_SESSION['ocs_admin_group_save'], $_GET);
+    $_SESSION['ocs_admin_group_add'] = array_merge($_SESSION['ocs_admin_group_add'], $_GET);
     
-    $form = drupal_get_form('ocs_admin_group_add_page'.$impl, $_SESSION['ocs_admin_group_save']);
+    $form = drupal_get_form('ocs_admin_group_add_page'.$impl, $_SESSION['ocs_admin_group_add']);
     $output = '<div id="ocs_admin_group_page_div">' . drupal_render( $form) . '</div>';
     
     return $output;
@@ -1304,6 +1332,7 @@ function ocs_admin_group_add_page( $impl = NULL, $arg = NULL, $init = TRUE)
 
 function ocs_admin_group_add_page_wizard( $form, &$form_state, $arg = NULL)
 {
+    dpm($arg, 'arg');
     $form = array();
     $form['section'] = array(
         '#type' => 'fieldset',
@@ -1367,6 +1396,7 @@ function ocs_admin_group_add_page_wizard( $form, &$form_state, $arg = NULL)
         '#type' => 'submit',
         '#value' => 'Search Account',
     );
+
     $form['actions'] = array('#type' => 'actions');
     $form['actions']['submit'] = array(
         '#type' => 'submit',
@@ -1390,7 +1420,6 @@ function ocs_admin_group_add_page_wizard( $form, &$form_state, $arg = NULL)
     } else if (isset($arg['account_key']) && ($_SESSION['form_mode'] != 'I')) {
         $form['section']['group']['group_name']['#default_value'] = $_SESSION['group_name'];
         $form['section']['group']['master_number']['#default_value'] = $arg['account_key'];
-//        $form['section']['discount']['limit_usage']['#default_value'] = $_SESSION['limit_usage'];
         $_SESSION['group_name'] = NULL;
         $_SESSION['form_mode'] = 'I';
     }
@@ -1458,10 +1487,7 @@ function ocs_admin_group_add_page_wizard_submit( $form, &$form_state)
 **************************************/
 function ocs_admin_subgroup_add_page( $group_id, $arg = NULL, $init = TRUE)
 {
-    if (! isset($_SESSION['ocs_admin_group_save'])) {
-        $_SESSION['ocs_admin_group_save'] = array();
-    }
-    $form = drupal_get_form('ocs_admin_subgroup_add_page_wizard', $group_id, $_SESSION['ocs_admin_group_save']);
+    $form = drupal_get_form('ocs_admin_subgroup_add_page_wizard', $group_id, $arg);
     $output = '<div id="ocs_admin_subgroup_page_div">' . drupal_render( $form) . '</div>';
     
     return $output;
