@@ -211,4 +211,47 @@ function ocs_admin_table_theme( $form, $header)
   return $output;
 }
 
+// get new content node
+function ocs_admin_get_new_node( $type)
+{
+    $node = (object) NULL;
+    $node->type = $type;
+    $node->uid = 0;
+    $node->created = strtotime("now");
+    $node->changed = strtotime("now");
+    $node->status = 1;
+    $node->comment = 0;
+    $node->promote = 0;
+    $node->moderate = 0;
+    $node->sticky = 0;
+    $node->language = 'und';
+
+    node_object_prepare($node);
+
+    return $node;
+}
+
+
+// ajax handlers
+
+function ocs_admin_ajax_message_form_callback( $form, &$form_state)
+{
+    return $form['valueset'];
+}
+
+function ocs_admin_get_counter_name_list()
+{
+	$counters = &drupal_static( __FUNCTION__, array());
+	if ( empty( $counters)) {
+        // get counter name list
+        module_load_include( 'inc', 'ocs_admin', 'ocs_counter');
+        $counter_list = ocs_admin_counter_name_load_all();
+        foreach( $counter_list as $value) {
+            $counters[ $value['counter_name']] = $value['counter_name'];
+        }
+    }
+
+    return $counters;
+}
+
 

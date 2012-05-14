@@ -207,21 +207,6 @@ function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id, $r
 	return $form;
 }
 
-function ocs_admin_get_counter_name_list()
-{
-	$counters = &drupal_static( __FUNCTION__, array());
-	if ( empty( $counters)) {
-        // get counter name list
-        module_load_include( 'inc', 'ocs_admin', 'ocs_counter');
-        $counter_list = ocs_admin_counter_name_load_all();
-        foreach( $counter_list as $value) {
-            $counters[ $value['counter_name']] = $value['counter_name'];
-        }
-    }
-
-    return $counters;
-}
-
 function ocs_admin_get_param_form( $paramlist, $param, $operator = NULL)
 {
     $type = _get_param_type( $paramlist, $param);

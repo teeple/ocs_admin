@@ -193,7 +193,7 @@ function update_ocs_param( $param)
         }
         else {
             // Create a node object, and add node properties.
-            $node = _get_new_node( 'ocs_param');
+            $node = ocs_admin_get_new_node( 'ocs_param');
             dpm( $node, 'new node');
         }
 
@@ -257,7 +257,7 @@ function update_ocs_events( $events)
         }
         else {
             // Create a node object, and add node properties.
-            $node = _get_new_node( 'ocs_events');
+            $node = ocs_admin_get_new_node( 'ocs_events');
             dpm( $node, 'new node');
         }
 
@@ -320,7 +320,7 @@ function update_ocs_states( $states)
         }
         else {
             // Create a node object, and add node properties.
-            $node = _get_new_node( 'ocs_account_state');
+            $node = ocs_admin_get_new_node( 'ocs_account_state');
             dpm( $node, 'new node');
         }
 
@@ -367,7 +367,7 @@ function update_ocs_actions( $actions)
         }
         else {
             // Create a node object, and add node properties.
-            $node = _get_new_node( 'ocs_actions');
+            $node = ocs_admin_get_new_node( 'ocs_actions');
             dpm( $node, 'new node');
         }
 
@@ -400,25 +400,6 @@ function update_ocs_actions( $actions)
     drupal_set_message( t( 'OCS Events are updated. Check it ') . l( t('here'), 'ocs_admin/event'));
 
     return TRUE;
-}
-
-function _get_new_node( $type)
-{
-    $node = (object) NULL;
-    $node->type = $type;
-    $node->uid = 0;
-    $node->created = strtotime("now");
-    $node->changed = strtotime("now");
-    $node->status = 1;
-    $node->comment = 0;
-    $node->promote = 0;
-    $node->moderate = 0;
-    $node->sticky = 0;
-    $node->language = 'und';
-
-    node_object_prepare($node);
-
-    return $node;
 }
 
 function ocs_admin_get_term_id( $vocabulary_name, $term)
