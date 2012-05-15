@@ -2,6 +2,7 @@
 
 module_load_include( 'inc', 'ocs_admin', 'ocs_common');
 module_load_include( 'inc', 'ocs_admin', 'ocs_campaign');
+module_load_include( 'inc', 'ocs_admin', 'ocs_message');
 
 /**
 * Implement hook_help().

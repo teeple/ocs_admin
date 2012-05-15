@@ -53,7 +53,7 @@ function ocs_admin_campaign_export( $form, &$form_state)
         '#markup' => $bonus_file_name,
     );
 
-    list( $action, $bonus) = _campaign_export();
+    list( $action, $bonus, $ocs_action) = _campaign_export();
 
     $form['action_rule'] = array(
         '#type' => 'textarea',
@@ -66,6 +66,13 @@ function ocs_admin_campaign_export( $form, &$form_state)
         '#type' => 'textarea',
         '#title' => 'activation_bonus.rule',
         '#value' => $bonus,
+        '#rows' => 10,
+    );
+
+    $form['ocs_action'] = array(
+        '#type' => 'textarea',
+        '#title' => 'ocs_action.rule',
+        '#value' => $ocs_action,
         '#rows' => 10,
     );
 
@@ -97,17 +104,24 @@ function ocs_admin_campaign_export_submit( $form, &$form_state)
             $passwd = variable_get('ocs_admin_user_password', 'Administrative Warning');
             $dir = variable_get('ocs_admin_config_directory', 'Administrative Warning');
 
-            // TODO: write rule file and upload it
-            $action_file_name = variable_get('ocs_admin_ocs_event_action_rule_file', 'Administrative Warning');
-            $bonus_file_name = variable_get('ocs_admin_ocs_activation_bonus_file', 'Administrative Warning');
-            foreach( array( $action_file_name, $bonus_file_name) as $file) {
-                $fd = fopen( '/tmp/'. $file, 'w');
-                fwrite( $fd, $values['action_rule']);
+            $files = array(
+                array(
+                    'fname' => variable_get('ocs_admin_ocs_event_action_rule_file', 'Administrative Warning'),
+                    'value' => $values['action_rule'],
+                    ),
+                array(
+                    'fname' => variable_get('ocs_admin_ocs_activation_bonus_file', 'Administrative Warning'),
+                    'value' => $values['bonus_rule'],
+                    ));
+
+            foreach( $files as $file) {
+                $fd = fopen( '/tmp/'. $file['fname'], 'w');
+                fwrite( $fd, $file['value']);
                 fclose( $fd);
 
                 // ftp to host
-                if ( _ftp_put( $ip_address, $user, $passwd, $dir, $file)) {
-                    drupal_set_message( t('Action Rule file is updated in the OCS'));
+                if ( ocs_admin_ftp_put( $ip_address, $user, $passwd, $dir, $file['fname'])) {
+                    drupal_set_message( t('Rule file "@name" is updated in the OCS', array( '@name' => $file['fname'])));
                 }
             }
         }
@@ -168,6 +182,8 @@ bonus_amount , int , result
     $newline = '
 ';
 
+    $ocs_action = '';
+
     foreach( $campaigns as $campaign) {
         $campaign_id = $campaign['campaign_id'];
         $events = ocs_admin_campaign_events_load_all( $campaign_id, 'event_id');
@@ -222,17 +238,24 @@ bonus_amount , int , result
                     foreach( $actions[ $rule_id] as $action) {
 //                        dpm( $action, 'action');
 
+
+                        $param_str = '';
+
+                        $param = ocs_admin_campaign_action_param_load( $action['action_id']);
+//                            dpm( $param, 'action param');
+                        foreach( $param as $para) {
+                            $param_str .= t('@n=@v,',
+                                array( '@n' => $para['param_name'], 
+                                    '@v' => _get_action_param_value( $para)));
+                        }
+
                         if ( $action['ocs_action_id'] == $action_give_bonus) {
                             $bonus_amount .= $newline . t('@name : targetRule = @name, ',
-                                array( '@name' => $rule_name));
-
-                            $param = ocs_admin_campaign_action_param_load( $action['action_id']);
-//                            dpm( $param, 'action param');
-                            foreach( $param as $para) {
-                                $bonus_amount .= t('@n=@v,',
-                                    array( '@n' => $para['param_name'], 
-                                        '@v' => _get_action_param_value( $para)));
-                            }
+                                array( '@name' => $rule_name)) . $param_str;
+                        }
+                        else {
+                            $node = node_load( $action['ocs_action_id']);
+                            $ocs_action .= $newline . $node->title . ' ' . $param_str;
                         }
                     }
                 }
@@ -242,25 +265,19 @@ bonus_amount , int , result
 
     }
 
-    dpm( $bonus_rules, 'rules');
+//    dpm( $bonus_rules, 'rules');
     $rule_str = '';
     foreach( $bonus_rules as $key => $len) {
         $rule_str .= t( '@key string(@len),', array( '@key' => $key, '@len' => $len)) . $newline;
     }
-    return array( $event_action, t( $bonus_cond, array('@rules' => $rule_str)) . $bonus_amount);
+    return array( $event_action, 
+        t( $bonus_cond, array('@rules' => $rule_str)) . $bonus_amount,
+        $ocs_action);
 }
 
 function _get_action_param_value( $param)
 {
-    $counter_id = &drupal_static( __FUNCTION__, array());
-    if ( empty( $counter_id)) {
-        module_load_include( 'inc', 'ocs_admin', 'ocs_counter');
-        $counter_list = ocs_admin_counter_name_load_all();
-        foreach( $counter_list as $counter) {
-            $counter_id[ $counter['counter_name']] = $counter['counter_id'];
-        }
-//        dpm( $counter_id, 'counter');
-    }
+    $counter_id = ocs_admin_get_counter_id_list();
 
     if ( $param['param_name'] == 'counter') {
         // return counter id

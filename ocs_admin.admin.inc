@@ -8,6 +8,7 @@ define( 'OCS_DEFAULT_STATE_FILE_NAME', 'OcsStateConfig.json');
 define( 'OCS_DEFAULT_SVC_PERM_FILE_NAME', 'OcsStatePermitConfig.json');
 define( 'OCS_EVENT_ACTION_RULE_FILE_NAME', 'event_actions.rule');
 define( 'OCS_ACTIVATION_BONUS_RULE_FILE_NAME', 'activation_bonus.rule');
+define( 'OCS_MESSAGE_FILE_NAME', 'OcsMessageConfig.json');
 
 
 define( 'OCS_ADMIN_NOTI_FLAG', 
@@ -131,6 +132,14 @@ function ocs_admin_config( $form, &$form_state)
             OCS_ACTIVATION_BONUS_RULE_FILE_NAME),
     );
 
+    $form['export']['ocs_message_file'] = array(
+        '#type' => 'textfield',
+        '#title' => 'Notification Message Config File Name',
+        '#description' => t('Enter the file name of OCS Notification Message Configuratin'),
+        '#default_value' => variable_get('ocs_admin_ocs_message_file',
+            OCS_MESSAGE_FILE_NAME),
+    );
+
     $form['account'] = array(
         '#type' => 'fieldset',
         '#title' => 'Account Field Customization',
@@ -210,6 +219,7 @@ function ocs_admin_config_submit( $form, &$form_state)
     variable_set('ocs_admin_ocs_svc_perm_file', $form_state['values']['ocs_svc_perm_file']);
     variable_set('ocs_admin_ocs_event_action_rule_file', $form_state['values']['ocs_event_action_rule_file']);
     variable_set('ocs_admin_ocs_activation_bonus_file', $form_state['values']['ocs_activation_bonus_file']);
+    variable_set('ocs_admin_ocs_message_file', $form_state['values']['ocs_message_file']);
 
     variable_set('ocs_admin_charging_type', $form_state['values']['charging_type']);
     variable_set('ocs_admin_subscription_type', $form_state['values']['subscription_type']);

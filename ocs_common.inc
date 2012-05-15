@@ -8,6 +8,7 @@ define( 'OCS_PARAM_TYPE_DATE', '5');
 define( 'OCS_PARAM_TYPE_TIME', '6');
 define( 'OCS_PARAM_TYPE_PRODUCT_KEY', '7');
 define( 'OCS_PARAM_TYPE_COUNTER', '8');
+define( 'OCS_PARAM_TYPE_MESSAGE', '9');
 
 function ocs_admin_get_param_type( $name)
 {
@@ -20,6 +21,7 @@ function ocs_admin_get_param_type( $name)
         'time' => OCS_PARAM_TYPE_TIME,
         'product_key' => OCS_PARAM_TYPE_PRODUCT_KEY,
         'counter' => OCS_PARAM_TYPE_COUNTER,
+        'message' => OCS_PARAM_TYPE_MESSAGE,
     );
 
     if (isset( $optype[$name])) return $optype[$name];
@@ -232,13 +234,6 @@ function ocs_admin_get_new_node( $type)
 }
 
 
-// ajax handlers
-
-function ocs_admin_ajax_message_form_callback( $form, &$form_state)
-{
-    return $form['valueset'];
-}
-
 function ocs_admin_get_counter_name_list()
 {
 	$counters = &drupal_static( __FUNCTION__, array());
@@ -252,6 +247,75 @@ function ocs_admin_get_counter_name_list()
     }
 
     return $counters;
+}
+
+
+function ocs_admin_get_message_list()
+{
+    $messages = &drupal_static( __FUNCTION__, array());
+    if ( empty( $messages)) {   
+        $items = entity_load( 'node', FALSE, array( 'type' => 'ocs_messages'));
+        foreach( $items as $item) {
+            dpm( $item, 'message');
+            $messages[$item->nid] = $item->nid . ' : ' . $item->field_format['und'][0]['value'];
+        }
+    }
+
+    return $messages;
+}
+
+function ocs_admin_get_counter_id_list()
+{
+    $counter_id = &drupal_static( __FUNCTION__, array());
+    if ( empty( $counter_id)) {
+        module_load_include( 'inc', 'ocs_admin', 'ocs_counter');
+        $counter_list = ocs_admin_counter_name_load_all();
+        foreach( $counter_list as $counter) {
+            $counter_id[ $counter['counter_name']] = $counter['counter_id'];
+        }
+    }
+
+    return $counter_id;
+}
+
+function ocs_admin_ftp_put( $ip_address, $user, $passwd, $dir, $file)
+{
+    $error_msg = NULL;
+
+    // put file to the OCS server by ftp
+
+    $ftp = ftp_connect( $ip_address);
+    if ( $ftp) {
+        $result = ftp_login( $ftp, $user, $passwd);
+        if ( $result ) {
+            if ( ftp_chdir( $ftp, $dir)) {
+                if ( ! ftp_put( $ftp, $file, '/tmp/'.$file, FTP_ASCII)) {
+                    $error_msg = t('Fail to put file %file to the server %addr at %dir.',
+                        array( '%file' => $file, '%addr' => $ip_address, '%dir' => $dir));
+                }
+            }
+            else {
+                $error_msg = t('Fail to change directory to %dir', array( '%dir' => $dir));
+            }
+            ftp_close( $ftp);
+        }
+        else {
+            $error_msg = t('Fail to login to the server %addr with user id "%user".',
+                array( '%addr' => $ip_address, '%user' => $user));
+        }
+    }
+    else {
+        $error_msg = t('Fail to connect the server %addr',
+            array( '%addr' => $ip_address));
+    }
+
+    if ( $error_msg) {
+        drupal_set_message( $error_msg, 'warning');
+        return FALSE;
+    }
+
+
+    return TRUE;
 }
 
 

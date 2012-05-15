@@ -221,11 +221,19 @@ function ocs_admin_get_param_form( $paramlist, $param, $operator = NULL)
         );
     }
     else if ( $type == OCS_PARAM_TYPE_COUNTER) {
-        $counters = ocs_admin_get_counter_name_list();
+        $options = ocs_admin_get_counter_id_list();
         $form = array(
             '#type' => 'select',
             '#title' => $title,
-            '#options' => $counters,
+            '#options' => array_flip( $options),
+        );
+    }
+    else if ( $type == OCS_PARAM_TYPE_MESSAGE) {
+        $options = ocs_admin_get_message_list();
+        $form = array(
+            '#type' => 'select',
+            '#title' => $title,
+            '#options' => $options,
         );
     }
     else {

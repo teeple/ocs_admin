@@ -8,7 +8,7 @@ function ocs_admin_message_form( $form, &$form_state, $nid = NULL, $op = NULL)
     $format = '';
     if ( $op == 'edit') {
         $node = node_load( $nid);
-        dpm( $node, 'node');
+//        dpm( $node, 'node');
         if ( $node) {
             $title = $node->title;
             $format = $node->field_format['und'][0]['value'];
@@ -80,6 +80,14 @@ function ocs_admin_message_form( $form, &$form_state, $nid = NULL, $op = NULL)
     return $form;
 }
 
+// ajax handlers
+
+function ocs_admin_ajax_message_form_callback( $form, &$form_state)
+{
+    return $form['valueset'];
+}
+
+
 function ocs_admin_message_form_validate( $form, &$form_state)
 {
     $values = $form_state['values'];
@@ -106,12 +114,12 @@ function ocs_admin_message_form_validate( $form, &$form_state)
         $counters = ocs_admin_get_counter_name_list();
         for( $i=1; $i <= $values['num_values']; $i++) {
             $words = str_word_count( $values['value'.$i], 1, '_');
-            dpm( $words, 'value'.$i);
+//            dpm( $words, 'value'.$i);
             foreach( $words as $word) {
                 if ( ! array_key_exists( $word, $counters)) {
                     form_set_error( 'value'.$i, t( 'Invalid counter name "@name".', 
                         array( '@name' => $word)));
-            }
+                }
             }
         }
     }
@@ -132,8 +140,24 @@ function ocs_admin_message_form_submit( $form, &$form_state)
         $node->title = $values['title'];
         $node->field_format['und'][0]['value'] = $values['format'];
 
+        $counter_id = ocs_admin_get_counter_id_list();
+
         for( $i=1; $i <= $values['num_values']; $i++) {
             $node->field_values['und'][$i-1]['value'] = $values['value'.$i];
+
+            $value_str = $values['value'.$i];
+            $words = str_word_count( $values['value'.$i], 1, '_');
+            foreach( $words as $word) {
+                if ( array_key_exists( $word, $counter_id)) {
+                    // replace counter name to counter id
+                    $id = $counter_id[$word];
+                    $value_str = preg_replace( '/\b'.$word.'\b/', t( 'COUNTER_INFO:getCounterValue(@id)', array( '@id' => $id)), $value_str);
+                }
+            }
+
+//            dpm( $value_str, 'value str');
+//            dpm( $node, 'node');
+            $node->field_value_str['und'][$i-1]['value'] = $value_str;
         }
 
         node_save( $node);
