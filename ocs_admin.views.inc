@@ -59,6 +59,9 @@ function ocs_admin_views_data() {
     $group_account = ocs_admin_group_account_view();
     $data = array_merge( $data, $group_account);
 
+    $group_extra = ocs_admin_group_extra();
+    $data = array_merge( $data, $group_extra);
+
     return $data;
 }    
 
@@ -1095,6 +1098,55 @@ function ocs_admin_group_account_view()
 }
 	
 
+function ocs_admin_group_extra()
+{
+    // Extra number of Group
+    $data['ocs_group_extra']['table']['name'] = 'ocsdata.ocs_group_extra';
+    $data['ocs_group_extra']['table']['group'] = t('OCS Group Extra Numbers');
+    $data['ocs_group_extra']['table']['base'] = array(
+        'field' => 'group_id',
+        'title' => t('OCS Group Extra Numbers'),
+        'help' => t('Extra Numbers registered in OCS Group'),
+        'database' => 'ocsdb',
+        'weight' => -10,
+    );
+
+    $data['ocs_group_extra']['table']['join'] = array(
+        'group' => array(
+            'left_field' => 'group_id',
+            'field' => 'group_id'
+        )
+    );
+
+    $data['ocs_group_extra']['group_id'] = _get_numeric_field( array(
+        'title' => t('Group ID'),
+        'help' => t('Group ID (OCS Group ID)'),
+    ));
+
+    $data['ocs_group_extra']['extra_number'] = _get_string_field( array(
+        'title' => t('Extra Numbr'),
+        'help' => t('Group ID'),
+    ));
+
+    $data['ocs_group_extra']['description'] = _get_string_field( array(
+        'title' => t('Description'),
+        'help' => t('Extra Number Description'),
+    ));
+
+    $data['ocs_group_extra']['group_name'] = array(
+        'title' => t('Group Name'),
+        'help' => t('Group Name'),
+        'relationship' => array(
+            'base' => 'ocs_group',
+            'field' => 'group_id',
+            'handler' => 'views_handler_relationship',
+            'label' => t('Group Name'),
+        ),
+    );
+
+    return $data;
+}
+    
 // view handler
 class views_handler_field_charging_type extends views_handler_field {
 
