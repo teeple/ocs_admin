@@ -157,6 +157,13 @@ function ocs_admin_group_edit_form( $form, &$form_state, $type, $groupid = NULL)
             '#type' => 'select', 
             '#options' => $min,
         );
+
+        $form['section']['discount']['discount_rate'] = array(
+            '#type' => 'textfield',
+            '#title' => t('Discount Rate(%)'),
+            '#size' => 10,
+            '#max_length' => 3,
+        );
     }
 
     $form['actions'] = array('#type' => 'actions');
@@ -181,6 +188,7 @@ function ocs_admin_group_edit_form( $form, &$form_state, $type, $groupid = NULL)
         $form['section']['discount']['from_min']['#default_value'] = (int)substr($group['from_time'], 2, 2);
         $form['section']['discount']['to_hour']['#default_value'] = (int)substr($group['to_time'], 0, 2);
         $form['section']['discount']['to_min']['#default_value'] = (int)substr($group['to_time'], 2, 2);
+        $form['section']['discount']['discount_rate']['#default_value'] = $group['discount_rate'];
         $_SESSION['form_mode'] = 'M';
         $_SESSION['group_name'] = $group['group_name'];
         $_SESSION['limt_usage'] = $group['limit_usage'];
@@ -836,6 +844,7 @@ function ocs_admin_group_save( $group)
         'limit_usage' => isset($group['limit_usage']) ? $group['limit_usage'] : 0,
         'from_time' => $from_time,
         'to_time' => $to_time,
+        'discount_rate' => isset($group['discount_rate']) ? $group['discount_rate'] : 0,
         );
     if ( isset( $group['master_number']))
         $fields['master_number'] = $group['master_number'];
@@ -1332,7 +1341,6 @@ function ocs_admin_group_add_page( $impl = NULL, $arg = NULL, $init = TRUE)
 
 function ocs_admin_group_add_page_wizard( $form, &$form_state, $arg = NULL)
 {
-    dpm($arg, 'arg');
     $form = array();
     $form['section'] = array(
         '#type' => 'fieldset',
@@ -1679,3 +1687,45 @@ function ocs_admin_limit_usage($form_state)
     else
         return 0;
 }
+
+function ocs_admin_extra_add($arg = NULL)
+{
+    $form = drupal_get_form('ocs_admin_extra_add_page', $arg);
+    $output = drupal_render( $form);
+    return $output;
+}
+
+function ocs_admin_extra_add_page($form, &$form_state, $arg)
+{
+    // OCS Group Extra Number Add    
+    $form = array();
+dpm($arg, 'arg');
+    $form['extra']['extra_number'] = array(
+        '#type' => 'textfield',
+        '#title' => 'Extra Number',
+        '#maxlength' => 64,
+        '#size' => 30,
+        '#required' => TRUE,
+    );
+    
+    $form['extra']['description'] = array(
+        '#type' => 'textfield',
+        '#title' => 'Description',
+        '#maxlength' => 100,
+        '#size' => 50,
+    );
+ 
+    $form['actions'] = array('#type' => 'actions');
+    $form['actions']['submit'] = array(
+        '#type' => 'submit',
+        '#value' => t('Save'),
+    );
+
+    $form['actions']['cancel'] = array(
+        '#type' => 'submit',
+        '#value' => t('Cancel'),
+    );
+    
+    return $form;
+}
+
