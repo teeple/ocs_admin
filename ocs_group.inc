@@ -225,7 +225,7 @@ function ocs_admin_group_edit_form_submit( $form, &$form_state)
             'ancestor_group_id' => $form_state['values']['ancestor_group_id'],
         );
         
-        drupal_goto( 'ocs_admin/account/group/master/select', array( 'query' => $query));
+        drupal_goto( 'ocs_admin/account/master/select', array( 'query' => $query));
     } else if ( $form_state['values']['op'] == 'Save') {
         ocs_admin_group_save($group);
 
@@ -768,7 +768,7 @@ function ocs_admin_member_edit_form_submit( $form, &$form_state)
 }
 
 /*
-** delete subgroup
+** delete member 
 */
 function ocs_admin_member_delete_confirm( $form, &$form_state, $groupid, $account_key)
 {
@@ -1331,6 +1331,7 @@ function ocs_admin_group_add_page( $impl = NULL, $arg = NULL, $init = TRUE)
     if (! isset($_SESSION['ocs_admin_group_add'])) {
         $_SESSION['ocs_admin_group_add'] = array();
     }
+    dpm( $_SESSION['ocs_admin_group_add'] , 'group_add_wizard');
     $_SESSION['ocs_admin_group_add'] = array_merge($_SESSION['ocs_admin_group_add'], $_GET);
     
     $form = drupal_get_form('ocs_admin_group_add_page'.$impl, $_SESSION['ocs_admin_group_add']);
@@ -1688,18 +1689,35 @@ function ocs_admin_limit_usage($form_state)
         return 0;
 }
 
-function ocs_admin_extra_add($arg = NULL)
+function ocs_admin_extra_add($group_id = NULL, $arg = NULL)
 {
-    $form = drupal_get_form('ocs_admin_extra_add_page', $arg);
+    if (! isset($_SESSION['ocs_admin_extra_add'])) {
+        $_SESSION['ocs_admin_extra_add'] = array();
+    }
+
+    $_SESSION['ocs_admin_extra_add'] = array_merge($_SESSION['ocs_admin_extra_add'], $_GET);
+    
+    $form = drupal_get_form('ocs_admin_extra_add_page', $group_id, $_SESSION['ocs_admin_extra_add']);
     $output = drupal_render( $form);
+
+    $_SESSION['ocs_admin_extra_add'] = array();
     return $output;
 }
 
-function ocs_admin_extra_add_page($form, &$form_state, $arg)
+function ocs_admin_extra_add_page($form, &$form_state, $group_id, $arg)
 {
+    if (isset($arg['extra_number'])) {
+        $extra = extra_number_load( $group_id, $arg['extra_number']);
+    }
+
     // OCS Group Extra Number Add    
     $form = array();
-dpm($arg, 'arg');
+   
+    $form['extra']['group_id'] = array(
+        '#type' => 'hidden',
+        '#value' => $group_id,
+    );
+
     $form['extra']['extra_number'] = array(
         '#type' => 'textfield',
         '#title' => 'Extra Number',
@@ -1725,7 +1743,88 @@ dpm($arg, 'arg');
         '#type' => 'submit',
         '#value' => t('Cancel'),
     );
+ 
+    if ( isset( $extra)) {
+        $form['extra']['extra_number']['#value'] = $extra[$group_id]['extra_number'];
+        $form['extra']['description']['#value'] = $extra[$group_id]['description'];
+        $extra = array();
+    }
     
     return $form;
 }
 
+function ocs_admin_extra_add_page_submit($form, &$form_state)
+{
+    db_set_active( 'ocsdb');
+    $extra = $form_state['values'];
+
+    $fields = array();
+    foreach( array( 'group_id', 'extra_number', 'description') as $field) {
+        if ( isset( $extra[$field]))
+            $fields[ $field] = $extra[ $field];
+    }
+
+     // insert
+    $status = db_merge( 'ocs_group_extra')
+        ->key( array( 'group_id' => $extra['group_id'], 
+                      'extra_number' => $extra['extra_number']))
+        ->fields( $fields)
+        ->execute();
+    
+    db_set_active( 'default');
+       
+    $form_state['redirect'] = 'ocs_admin/group/'.$extra['group_id'].'/extra';
+}
+
+function extra_number_load($group_id, $extra_number)
+{
+   if ( !is_null( $group_id) && $extra_number) {
+       db_set_active('ocsdb');
+
+       $query = db_select( 'ocs_group_extra', 'g');
+       $groups = $query->fields( 'g')
+            ->condition('group_id', $group_id, '=')
+            ->condition('extra_number', $extra_number, '=')
+            ->execute()
+            ->fetchAllAssoc( 'group_id', PDO::FETCH_ASSOC);
+    } 
+    db_set_active('default');
+    return $groups;
+}
+
+/*
+** delete a extra number 
+*/
+function ocs_admin_extra_delete_confirm( $form, &$form_state, $group_id, $extra_number)
+{
+    $form['#group_id'] = $group_id;
+    $form['#extra_number'] = $extra_number;
+
+    $caption = '<p>' . 
+        t('<strong>Warning:</strong> The extra number "%key" will be deleted from the group "%group".',
+            array( '%key' => $extra_number, '%group' => $group_id)) .'</p>';
+    $caption .= '<p>'. t('This action cannot be undone.') . '</p>';
+     
+    return confirm_form( $form, t('Are you sure to delete the extra number "%key"?',
+        array( '%key' => $extra_number)),
+        t('ocs_admin/group/"%group"/extra/"%extra"/delete',
+            array('%group' => $group_id, '%extra' => $extra_number)),
+        $caption, t('Delete'));
+    
+}        
+
+function ocs_admin_extra_delete_confirm_submit($form, &$form_state)
+{
+    db_set_active( 'ocsdb');
+
+    // delete
+    $status = db_delete( 'ocs_group_extra')
+        ->condition( 'group_id', $form['#group_id'], '=')
+        ->condition( 'extra_number', $form['#extra_number'], '=')
+        ->execute();
+    drupal_set_message( t('The extra number  %key has been deleted.', 
+        array('%key' => $form['#extra_number'])));
+
+    $form_state['redirect'] = 'ocs_admin/group/'.$form['#group_id'].'/extra';
+    db_set_active( 'default');
+}
