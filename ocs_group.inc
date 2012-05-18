@@ -1694,31 +1694,40 @@ function ocs_admin_extra_add($group_id = NULL, $arg = NULL)
     if (! isset($_SESSION['ocs_admin_extra_add'])) {
         $_SESSION['ocs_admin_extra_add'] = array();
     }
-
     $_SESSION['ocs_admin_extra_add'] = array_merge($_SESSION['ocs_admin_extra_add'], $_GET);
-    
     $form = drupal_get_form('ocs_admin_extra_add_page', $group_id, $_SESSION['ocs_admin_extra_add']);
     $output = drupal_render( $form);
-
     $_SESSION['ocs_admin_extra_add'] = array();
     return $output;
 }
 
 function ocs_admin_extra_add_page($form, &$form_state, $group_id, $arg)
 {
-    if (isset($arg['extra_number'])) {
-        $extra = extra_number_load( $group_id, $arg['extra_number']);
+    if (isset($arg)) {
+        $extra = extra_number_load( $group_id, $arg);
+        $_SESSION['account_key'] = $arg;
     }
 
     // OCS Group Extra Number Add    
     $form = array();
-   
+    
     $form['extra']['group_id'] = array(
         '#type' => 'hidden',
         '#value' => $group_id,
     );
 
-    $form['extra']['extra_number'] = array(
+    $form['extra']['group_type'] = array(
+        '#type' => 'hidden',
+        '#value' => 3,
+    );
+
+    $form['extra']['ancestor_group_id'] = array(
+        '#type' => 'hidden',
+        '#value' => $group_id,
+    );
+
+
+    $form['extra']['account_key'] = array(
         '#type' => 'textfield',
         '#title' => 'Extra Number',
         '#maxlength' => 64,
@@ -1744,12 +1753,11 @@ function ocs_admin_extra_add_page($form, &$form_state, $group_id, $arg)
         '#value' => t('Cancel'),
     );
  
-    if ( isset( $extra)) {
-        $form['extra']['extra_number']['#value'] = $extra[$group_id]['extra_number'];
+    if (isset( $extra[$group_id])) {
+        $form['extra']['account_key']['#value'] = $extra[$group_id]['account_key'];
         $form['extra']['description']['#value'] = $extra[$group_id]['description'];
         $extra = array();
     }
-    
     return $form;
 }
 
@@ -1757,34 +1765,60 @@ function ocs_admin_extra_add_page_submit($form, &$form_state)
 {
     db_set_active( 'ocsdb');
     $extra = $form_state['values'];
-
     $fields = array();
-    foreach( array( 'group_id', 'extra_number', 'description') as $field) {
+    foreach( array( 'group_id', 'group_type', 'ancestor_group_id', 'account_key', 'description') as $field) {
         if ( isset( $extra[$field]))
             $fields[ $field] = $extra[ $field];
     }
 
-     // insert
-    $status = db_merge( 'ocs_group_extra')
-        ->key( array( 'group_id' => $extra['group_id'], 
-                      'extra_number' => $extra['extra_number']))
-        ->fields( $fields)
-        ->execute();
+    try {
+        $default_value = array (
+            'group_id' => $fields['group_id'],
+            'group_type' => $fields['group_type'],
+            'ancestor_group_id' => $fields['ancestor_group_id'],
+            'account_key' => $fields['account_key'],
+            'description' => $fields['description'],
+            );
+
+        $result = db_insert('ocs_group_member')
+            ->fields($default_value)
+            ->execute();
+    }
+    catch(Exception $e){
+        try {
+            $default_value = array();
+            $default_value = array(
+                'account_key' => $fields['account_key'],
+                'description' => $fields['description']
+                );
+            $result = db_update('ocs_group_member')
+                ->fields($default_value)
+                ->condition('group_id', $fields['group_id'], '=')
+                ->condition('account_key', $_SESSION['account_key'], '=')
+                ->execute();
+            }
+            catch(exception $e){
+                $txn->rollback();
+                dpm($e, 'db transaction failed');
+                watchdog_exception('ocs_admin', $e);
+            }
+    }
+    $_SESSION['account_key'] = '';
+    db_set_active('default');
     
-    db_set_active( 'default');
-       
     $form_state['redirect'] = 'ocs_admin/group/'.$extra['group_id'].'/extra';
 }
 
-function extra_number_load($group_id, $extra_number)
+function extra_number_load($group_id, $account_key)
 {
-   if ( !is_null( $group_id) && $extra_number) {
+   if ( !is_null( $group_id) && $account_key) {
        db_set_active('ocsdb');
 
-       $query = db_select( 'ocs_group_extra', 'g');
+       $query = db_select( 'ocs_group_member', 'g');
        $groups = $query->fields( 'g')
             ->condition('group_id', $group_id, '=')
-            ->condition('extra_number', $extra_number, '=')
+            ->condition('group_type', '3', '=')
+            ->condition('account_key', $account_key, '=')
             ->execute()
             ->fetchAllAssoc( 'group_id', PDO::FETCH_ASSOC);
     } 
@@ -1795,20 +1829,20 @@ function extra_number_load($group_id, $extra_number)
 /*
 ** delete a extra number 
 */
-function ocs_admin_extra_delete_confirm( $form, &$form_state, $group_id, $extra_number)
+function ocs_admin_extra_delete_confirm( $form, &$form_state, $group_id, $account_key)
 {
     $form['#group_id'] = $group_id;
-    $form['#extra_number'] = $extra_number;
+    $form['#account_key'] = $account_key;
 
     $caption = '<p>' . 
         t('<strong>Warning:</strong> The extra number "%key" will be deleted from the group "%group".',
-            array( '%key' => $extra_number, '%group' => $group_id)) .'</p>';
+            array( '%key' => $account_key, '%group' => $group_id)) .'</p>';
     $caption .= '<p>'. t('This action cannot be undone.') . '</p>';
      
     return confirm_form( $form, t('Are you sure to delete the extra number "%key"?',
-        array( '%key' => $extra_number)),
+        array( '%key' => $account_key)),
         t('ocs_admin/group/"%group"/extra/"%extra"/delete',
-            array('%group' => $group_id, '%extra' => $extra_number)),
+            array('%group' => $group_id, '%extra' => $account_key)),
         $caption, t('Delete'));
     
 }        
@@ -1818,13 +1852,15 @@ function ocs_admin_extra_delete_confirm_submit($form, &$form_state)
     db_set_active( 'ocsdb');
 
     // delete
-    $status = db_delete( 'ocs_group_extra')
+    $status = db_delete( 'ocs_group_member')
         ->condition( 'group_id', $form['#group_id'], '=')
-        ->condition( 'extra_number', $form['#extra_number'], '=')
+        ->condition( 'account_key', $form['#account_key'], '=')
         ->execute();
     drupal_set_message( t('The extra number  %key has been deleted.', 
-        array('%key' => $form['#extra_number'])));
+        array('%key' => $form['#account_key'])));
 
     $form_state['redirect'] = 'ocs_admin/group/'.$form['#group_id'].'/extra';
     db_set_active( 'default');
 }
+
+
