@@ -43,7 +43,7 @@ ul.action-links a {
     margin: 0 1em 0 0; 
 }
 
-.description {
+.event-name {
 background: lightgray;
 }
 
@@ -70,3 +70,9 @@ border: 0 none;
 .white-cell {
     background-color: white;
 }
+
+.wide-width {
+      width: 100px;
+}
+
+

@@ -3,6 +3,7 @@
 module_load_include( 'inc', 'ocs_admin', 'ocs_common');
 module_load_include( 'inc', 'ocs_admin', 'ocs_campaign');
 module_load_include( 'inc', 'ocs_admin', 'ocs_message');
+module_load_include( 'inc', 'ocs_admin', 'ocs_state');
 
 /**
 * Implement hook_help().
@@ -313,6 +314,10 @@ function ocs_admin_theme()
         ),
         'ocs_admin_campaign_rule_form' => array(
             'file' => 'ocs_campaign.inc',
+            'render element' => 'form',
+        ),
+        'ocs_admin_transition_rule_form' => array(
+            'file' => 'ocs_state.inc',
             'render element' => 'form',
         ),
     );

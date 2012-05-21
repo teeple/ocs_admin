@@ -143,7 +143,37 @@ function ocs_admin_import_ocs_config_submit( $form, &$form_state)
 
 function ocs_admin_event_save( $event_json)
 {
+    $event_json = preg_replace( "#\\\\'#", "\\\\\\\\'", $event_json);
     $json = json_decode( $event_json, true);
+    if ( empty( $json)) {
+        $errstr = '';
+        switch (json_last_error()) {
+        case JSON_ERROR_NONE:
+            $errstr = ' - No errors';
+            break;
+        case JSON_ERROR_DEPTH:
+            $errstr = ' - Maximum stack depth exceeded';
+            break;
+        case JSON_ERROR_STATE_MISMATCH:
+            $errstr = ' - Underflow or the modes mismatch';
+            break;
+        case JSON_ERROR_CTRL_CHAR:
+            $errstr = ' - Unexpected control character found';
+            break;
+        case JSON_ERROR_SYNTAX:
+            $errstr = ' - Syntax error, malformed JSON';
+            break;
+        case JSON_ERROR_UTF8:
+            $errstr = ' - Malformed UTF-8 characters, possibly incorrectly encoded';
+            break;
+        default:
+            $errstr = ' - Unknown error';
+            break;
+        }
+
+        drupal_set_message( 'Fail to decode json string'. $errstr, 'error');
+        return FALSE;
+    }
 
     if ( update_ocs_param( $json["OCS_PARAM"]) &&
         update_ocs_events( $json["OCS_EVENT"]) &&
@@ -175,6 +205,7 @@ function update_ocs_param( $param)
             "param_type":"END_USER_E164"},
         "REMAINS":
             {"param_desc":"",
+            "rule":"int, ..",
             "param_type":"ACCOUNT"},
         "CALLED":
             {"param_desc":"",
@@ -185,6 +216,7 @@ function update_ocs_param( $param)
 
     */
 
+    dpm( $param, 'param');
     foreach( $param as $param_name => $param_info) {
         if ( isset( $node_nids[ $param_name])) {
             // client id exist, modify it
@@ -202,6 +234,7 @@ function update_ocs_param( $param)
         $node->field_description['und'][0]['value'] = $param_info['param_desc'];
         $node->field_ocs_param_type['und'][0]['value'] = ocs_admin_get_param_type( $param_info['param_type']);
         $node->field_ocs_param_value['und'][0]['value'] = isset( $param_info['param_value']) ? json_encode( $param_info['param_value']) : '';
+        $node->field_rule_property['und'][0]['value'] = isset( $param_info['rule']) ? $param_info['rule'] : '';
 
         node_save( $node);
     }

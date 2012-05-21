@@ -3,7 +3,7 @@
 
 function ocs_admin_campaign_action_form( $form, &$form_state, $campaign_id, $rule_id, $action_id = NULL, $op = NULL)
 {
-	$selected_action = isset( $form_state['values']['action_id']) ? $form_state['values']['action_id'] : NULL;
+	$selected_action = isset( $form_state['values']['ocs_action_id']) ? $form_state['values']['ocs_action_id'] : NULL;
 
     if ( $op == 'edit') {
         $edit_action = ocs_admin_campaign_action_load( $action_id);
@@ -12,7 +12,9 @@ function ocs_admin_campaign_action_form( $form, &$form_state, $campaign_id, $rul
     }
 
     $form['#op'] = $op;
+    $form['#campaign_id'] = $campaign_id;
     $form['#action_id'] = $action_id;
+    $form['#rule_id'] = $rule_id;
 
     $form['body'] = array(
         '#type' => 'markup',
@@ -28,17 +30,6 @@ function ocs_admin_campaign_action_form( $form, &$form_state, $campaign_id, $rul
 		'#type' => 'item',
 		'#title' => t( 'Rule : <em>@name</em>', array('@name' => $_GET['rule_name'])), 
 	);
-
-    $form['campaign_id'] = array(
-        '#type' => 'hidden',
-        '#value' => $campaign_id,
-    );
-
-    $form['rule_id'] = array(
-        '#type' => 'hidden',
-        '#value' => $rule_id,
-    );
-
 
     $items = entity_load('node', FALSE, array('type' => 'ocs_actions'));
     $options = array();
@@ -58,7 +49,7 @@ function ocs_admin_campaign_action_form( $form, &$form_state, $campaign_id, $rul
     dpm( $items, 'actions');
     dpm( $selected_action, 'selected');
 
-	$form['action_id'] = array(
+	$form['ocs_action_id'] = array(
 		'#type' => 'select',
 		'#title' => t('Action to add'),
 		'#options' => $options,
@@ -138,26 +129,14 @@ function ocs_admin_campaign_action_form_submit( $form, &$form_state)
 //    dpm( $form_state['values'], 'form_state');
     $values = $form_state['values'];
     if ( $values['op'] != 'Cancel') {
-        $param = array();
-        $output = $form['#action_name'];
-        foreach( $form['#param_name_list'] as $key) {
-            $param[] = array(
-                'param_id' => $key,
-                'param_name' => $form['param'][$key]['#title'],
-                'value' => $values[$key],
-                'action_id' => $form['#action_id'],
-            );
-            $v = $values[$key];
-            $output .= t( ' @name=@value', array( '@name' => $form['param'][$key]['#title'],
-                '@value' => isset($form['param'][$key]['#options']) ? $form['param'][$key]['#options'][$v] : $v));
-        }
+        list( $param, $output) = ocs_admin_get_action_param_list( $form, $values);
 
-        dpm( $form['action_id'], 'action');
+        dpm( $form['#action_id'], 'action');
 
         $action = array(
             'action_id' => $form['#action_id'],
-            'rule_id' => $values['rule_id'],
-            'ocs_action_id' => $values['action_id'],
+            'rule_id' => $form['#rule_id'],
+            'ocs_action_id' => $values['ocs_action_id'],
             'action_name' => $output,
         );
 
@@ -168,7 +147,30 @@ function ocs_admin_campaign_action_form_submit( $form, &$form_state)
     }
 
 
-    $form_state['redirect'] = 'ocs_admin/campaign/' . $values['campaign_id'] .'/rule';
+    $form_state['redirect'] = 'ocs_admin/campaign/' . $form['#campaign_id'] .'/rule';
+}
+
+function ocs_admin_get_action_param_list( $form, $values)
+{
+    $param = array();
+
+    // get action name
+    $output = $form['#action_name'];
+
+    // for each parameter name, build param[] array
+    foreach( $form['#param_name_list'] as $key) {
+        $param[] = array(
+            'param_id' => $key,
+            'param_name' => $form['param'][$key]['#title'],
+            'value' => $values[$key],
+            'action_id' => $form['#action_id'],
+        );
+        $v = $values[$key];
+        $output .= t( ' @name=@value', array( '@name' => $form['param'][$key]['#title'],
+            '@value' => isset($form['param'][$key]['#options']) ? $form['param'][$key]['#options'][$v] : $v));
+    }
+
+    return array( $param, $output);
 }
 
 /*
@@ -193,6 +195,8 @@ function ocs_admin_campaign_action_add( $action, $params)
     }
 
     db_set_active( 'default');
+
+    return $action_id;
 }
  
 /*
@@ -205,9 +209,9 @@ function ocs_admin_campaign_action_save( $action, $params)
     $txn = db_transaction();
 
     try {
-        $result = db_update( 'ocs_campaign_actions')
+        $result = db_merge( 'ocs_campaign_actions')
+            ->key( array( 'action_id' => $action['action_id']))
             ->fields( $action)
-            ->condition( 'action_id', $action['action_id'], '=')
             ->execute();
 
         $result = db_delete( 'ocs_campaign_action_param')
@@ -226,6 +230,8 @@ function ocs_admin_campaign_action_save( $action, $params)
     }
 
     db_set_active( 'default');
+
+    return $action['action_id'];
 }
  
 /*
@@ -356,7 +362,7 @@ function ocs_admin_campaign_action_load( $action_id)
         ->fetchAllAssoc( 'param_id', PDO::FETCH_ASSOC);
 
     $result['param'] = $param;
-    dpm( $result, 'action');
+//    dpm( $result, 'action');
 
     db_set_active( 'default');
 

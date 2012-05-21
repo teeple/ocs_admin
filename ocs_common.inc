@@ -143,6 +143,13 @@ function ocs_admin_tree_table_theme( $form, $header)
       $row = array();
       $row[] = theme('indentation', array('size' => $element['#item']['depth'] - 1)) . drupal_render($element['title']);
       $row[] = drupal_render($element['weight']) . drupal_render($element['plid']) . drupal_render($element['mlid']);
+
+      // master number
+      $row[] = array( 'data' => drupal_render($element['info'][0]), 'class' => array('wide-width'));
+
+      // limit usage
+      $row[] = array( 'data' => drupal_render($element['info'][1]), 'class' => array('wide-width'));
+
       $row = array_merge( $row, $operations);
 
       $row = array_merge(array('data' => $row), $element['#attributes']);

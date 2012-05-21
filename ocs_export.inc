@@ -64,8 +64,9 @@ function ocs_admin_export_state_transition( $form, &$form_state)
     // build json
     $json = array();
     foreach( $result as $item) {
+//        dpm( $item, 'item');
         $action_list = array();
-        foreach( $item->field_field_ocs_action_ref as $action) {
+        foreach( $item->field_field_rule_param as $action) {
             $action_list[] = $action['rendered']['#markup'];
         }
 
@@ -359,7 +360,8 @@ function ocs_admin_export_message( $form, &$form_state)
         ));
     }
 
-    $json_file = json_encode( array( 'nodes' => $json));
+    // remove '\/' from encoded string
+    $json_file = preg_replace( '#\\\\/#', '/', json_encode( array( 'nodes' => $json)));
 //    dpm( $json_file, 'json');
 
     $form['file_content'] = array(

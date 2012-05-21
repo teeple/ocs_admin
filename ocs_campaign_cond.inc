@@ -7,7 +7,7 @@ function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id, $r
 	$cond_idx = isset( $_GET['idx']) ? $_GET['idx'] : 
         (isset( $form_state['values']) ? $form_state['values']['cond_idx'] : time());
     $operator = isset( $form_state['values']) ? $form_state['values']['operator'] : NULL;
-    $direct_input = isset( $form_state['values']['direct_input']) ? $form_state['values']['direct_input'] : 1;
+    $direct_input = isset( $form_state['values']['direct_input']) ? $form_state['values']['direct_input'] : 0;
 
 	if ( $op == 'edit') {
 		// it's editing mode
@@ -135,7 +135,7 @@ function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id, $r
 
     $form['container']['valueset']['direct_input'] = array(
         '#type' => 'checkbox',
-        '#title' => 'Input direct value',
+        '#title' => "Input counter value from calling party's account",
 //        '#default_value' => $direct_input,
         '#default_value' => $direct_input,
         '#ajax' => array(
@@ -150,12 +150,13 @@ function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id, $r
     );
 
 //    dpm( $direct_input, 'dir input');
-    if ( ! empty($direct_input) || $operator == 'between' ) {
+    if ( ! $direct_input || $operator == 'between' ) {
         $form['container']['valueset']['value'] = ocs_admin_get_param_form( $paramlist, $selected_param, $operator);
         dpm( $form['container']['valueset']['value'], 'direct input');
 
         if ( $operator == 'between') {
             $form['container']['valueset']['value2'] = $form['container']['valueset']['value'];
+            $form['container']['valueset']['value2']['#weight'] = 10;
             unset( $form['container']['valueset']['value2']['#title']);
         }
         if ( isset($condition))  {
@@ -214,6 +215,7 @@ function ocs_admin_get_param_form( $paramlist, $param, $operator = NULL)
 
     if ($type == OCS_PARAM_TYPE_ENUM) {
         $options = array_flip( $paramlist[$param.':enum']);
+        dpm( $options, 'enum');
         $form = array(
             '#type' => ($operator == 'in list') ? 'checkboxes' : 'radios',
             '#title' => $title,
@@ -311,7 +313,7 @@ function _campaign_operator( $paramlist, $selected)
 			'=', '>', '>=', '<', '<=', 'between',
             ),
 		OCS_PARAM_TYPE_PRODUCT_KEY => array(
-			'=', '>', '>=', '<', '<=', 'between',
+			'=', 
             ),
 	);
 
@@ -420,8 +422,8 @@ function ocs_admin_campaign_add_cond_form_submit( $form, &$form_state)
 	dpm( $values, 'values submit');
 	if ( $values['op'] != 'Cancel') {
 		$list = explode( ':', $values['param']);     // format : 'rule_id:param_id:string'
-        $value1 = _get_param_value( $form['#paramlist'], $values['param'], $values['value']);
-        $value2 = _get_param_value( $form['#paramlist'], $values['param'], $values['value2']);
+        list( $value1, $value1_print) = _get_param_value( $form['#paramlist'], $values['param'], $values['value']);
+        list( $value2, $value2_print) = _get_param_value( $form['#paramlist'], $values['param'], $values['value2']);
 		$cond = array(
             'cond_id' => $form['#cond_id'],
 			'rule_id' => $list[0],
@@ -432,17 +434,17 @@ function ocs_admin_campaign_add_cond_form_submit( $form, &$form_state)
 			'direct_input' => $values['direct_input'],
 			'value' => $value1,
 			'value2' => $value2,
-            'cond_rule' => t('@para !op @value @value2', array(
-					'@para' =>  _get_param_name( $form['#paramlist'], $values['param'], $values['counter']),
+            'cond_rule' => t('!para !op !value !value2', array(
+					'!para' =>  _get_param_name( $form['#paramlist'], $values),
 					'!op' => $values['operator'],
-					'@value' => $values['value'],
-                    '@value2' => ($values['operator'] == 'between') ? ', '. $values['value2'] : '')),
-			'cond_name' => t( '@counter @para @op @value @value2', array( 
-                    '@counter' => isset($values['counter']) ? $values['counter'] : '',
-					'@para' =>  $form['#paramlist'][ $values['param']],
-					'@op' => $values['operator'],
-					'@value' => $value1,
-                    '@value2' => ($values['operator'] == 'between') ? 'and '. $value2 : '')),
+					'!value' => $value1_print,
+                    '!value2' => ($values['operator'] == 'between') ? ', '. $value2_print : '')),
+			'cond_name' => t( '!counter !para !op !value !value2', array( 
+                    '!counter' => isset($values['counter']) ? $values['counter'] : '',
+					'!para' =>  $form['#paramlist'][ $values['param']],
+					'!op' => $values['operator'],
+					'!value' => $value1_print,
+                    '!value2' => ($values['operator'] == 'between') ? 'and '. $value2_print : '')),
 		);
         dpm( $cond, 'condition to submit');
         if ( $form['#op'] == 'edit')
@@ -454,14 +456,14 @@ function ocs_admin_campaign_add_cond_form_submit( $form, &$form_state)
 	$form_state['redirect'] = 'ocs_admin/campaign/' . $form['#campaign_id'] . '/rule';
 }
 
-function _get_param_name( $paramlist, $param, $counter)
+function _get_param_name( $paramlist, $values)
 {
-    $type = _get_param_type( $paramlist, $param);
+    $type = _get_param_type( $paramlist, $values['param']);
     if ( $type == OCS_PARAM_TYPE_ACCOUNT_KEY) {
-        return $counter;
+        return isset($values['counter']) ? $values['counter'] : 'unknown';
     }
 
-    return $paramlist[ $param];
+    return $paramlist[ $values['param']];
 }
 
 
@@ -471,12 +473,10 @@ function _get_param_value( $paramlist, $param, $value)
     if ( $type == OCS_PARAM_TYPE_ENUM) {
         $enum_list = array_flip( $paramlist[$param.':enum']);
 
-        dpm( $value, 'param value');
-
         $selected = array();
         if ( is_array( $value)) {
             foreach( $value as $key => $item) {
-                if ( $item != 0) {  // it's selected
+                if ( ! empty($item) ) {  // it's selected
                     $selected[$enum_list[$key]] = $key;
                 }
             }
@@ -487,10 +487,10 @@ function _get_param_value( $paramlist, $param, $value)
         }
 
         // return json encoded string
-        return json_encode( $selected);
+        return array( json_encode( $selected), '('.implode( ', ', array_values( $selected)). ')');
     }
 
-    return $value;
+    return array( $value, $value);
 }
 
 /*

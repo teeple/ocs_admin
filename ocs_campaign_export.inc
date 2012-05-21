@@ -53,7 +53,7 @@ function ocs_admin_campaign_export( $form, &$form_state)
         '#markup' => $bonus_file_name,
     );
 
-    list( $action, $bonus, $ocs_action) = _campaign_export();
+    list( $action, $bonus) = _campaign_export();
 
     $form['action_rule'] = array(
         '#type' => 'textarea',
@@ -66,13 +66,6 @@ function ocs_admin_campaign_export( $form, &$form_state)
         '#type' => 'textarea',
         '#title' => 'activation_bonus.rule',
         '#value' => $bonus,
-        '#rows' => 10,
-    );
-
-    $form['ocs_action'] = array(
-        '#type' => 'textarea',
-        '#title' => 'ocs_action.rule',
-        '#value' => $ocs_action,
         '#rows' => 10,
     );
 
@@ -163,7 +156,7 @@ promotion_parameter, string(256) , result, mandatory';
     $bonus_cond = '
 
 [RULESET_ACTIVATION_BONUS_CONDITION]
-@rules
+!rules
 
 [ACTIVATION_BONUS_CONDITION]
 ';
@@ -171,13 +164,14 @@ promotion_parameter, string(256) , result, mandatory';
     $bonus_amount = '
 [RULESET_ACTIVATION_BONUS_AMOUNT]
 targetRule , string(32)
-counter_id, string(32), result
-bonus_amount , int , result
+db_action , string(128)
+!rules
  
 [ACTIVATION_BONUS_AMOUNT]
 ';
 
     $bonus_rules = array();
+    $amount_rules = array();
 
     $newline = '
 ';
@@ -223,11 +217,8 @@ bonus_amount , int , result
 
                         list( $factor, $op, $value) = explode( ' ', $cond['cond_rule']);
 
-                        if ( isset( $bonus_rules[$factor] )) {
-                            $bonus_rules[ $factor] = max( strlen( $value), $bonus_rules[$factor]);
-                        }
-                        else {
-                            $bonus_rules[ $factor] = strlen( $value);
+                        if ( ! isset( $bonus_rules[$factor])) {
+                            $bonus_rules[ $factor] = _get_rule_property( $cond['param_id'], $factor);
                         }
                     }
                 }
@@ -236,27 +227,39 @@ bonus_amount , int , result
 
                     $i =0;
                     foreach( $actions[ $rule_id] as $action) {
-//                        dpm( $action, 'action');
-
-
-                        $param_str = '';
-
                         $param = ocs_admin_campaign_action_param_load( $action['action_id']);
-//                            dpm( $param, 'action param');
-                        foreach( $param as $para) {
-                            $param_str .= t('@n=@v,',
-                                array( '@n' => $para['param_name'], 
-                                    '@v' => _get_action_param_value( $para)));
-                        }
 
                         if ( $action['ocs_action_id'] == $action_give_bonus) {
+                            // build parameter string : bonus_amount=123,counter_id=0,
+                            $param_str = '';
+                            foreach( $param as $para) {
+                                $factor = $para['param_name'];
+                                $param_str .= t('@n=@v,',
+                                    array( '@n' => $factor, '@v' => _get_action_param_value( $para)));
+
+                                if ( ! isset( $amount_rules[$factor])) {
+                                    $amount_rules[$factor] = _get_rule_property( $cond['param_id'], $factor);
+                                }
+                            }
+
                             $bonus_amount .= $newline . t('@name : targetRule = @name, ',
                                 array( '@name' => $rule_name)) . $param_str;
                         }
                         else {
+                            // build parameter string in this format : send_noti&msgid=123&counter_id=0,
+                            $param_str = '';
+                            foreach( $param as $para) {
+                                $param_str .= t('&@n=@v',
+                                    array( '@n' => $factor, 
+                                        '@v' => _get_action_param_value( $para)));
+                            }
+
                             $node = node_load( $action['ocs_action_id']);
-                            $ocs_action .= $newline . $node->title . ' ' . $param_str;
+                            $bonus_amount .= $newline . t("@name : targetRule = @name, db_action='@action!param'",
+                                array( '@name' => $rule_name, '@action' => $node->title,
+                                    '!param' => $param_str));
                         }
+
                     }
                 }
             }
@@ -267,12 +270,33 @@ bonus_amount , int , result
 
 //    dpm( $bonus_rules, 'rules');
     $rule_str = '';
-    foreach( $bonus_rules as $key => $len) {
-        $rule_str .= t( '@key string(@len),', array( '@key' => $key, '@len' => $len)) . $newline;
+    foreach( $bonus_rules as $key => $property) {
+        $rule_str .= $key . ', ' . $property . $newline;
     }
-    return array( $event_action, 
-        t( $bonus_cond, array('@rules' => $rule_str)) . $bonus_amount,
-        $ocs_action);
+    $bonus_cond = t( $bonus_cond, array('!rules' => $rule_str));
+
+    $rule_str = '';
+    foreach( $amount_rules as $key => $property) {
+        $rule_str .= $key . ', ' . $property . $newline;
+    }
+    $bonus_amount = t( $bonus_amount, array('!rules' => $rule_str));
+    
+    return array( $event_action, $bonus_cond. $bonus_amount);
+}
+
+function _get_rule_property( $param_id, $factor)
+{
+    // return 'int' for account counters
+    if ( substr( $param_id, -7) == 'account') {
+        return 'int ';
+    }
+
+    $items = entity_load( 'node', FALSE, array( 'type' => 'ocs_param', 'title' => $factor));
+    $item = array_shift( $items);
+    if ( ! empty($item)) {
+        return $item->field_rule_property['und'][0]['value'];
+    }
+    return '';
 }
 
 function _get_action_param_value( $param)

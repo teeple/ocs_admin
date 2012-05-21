@@ -402,9 +402,8 @@ function _ocs_group_tree_form($tree) {
       $mlid = 'mlid:' . $item['mlid'];
       $form[$mlid]['#item'] = $item;
       $form[$mlid]['#attributes'] = array( 'class' => array('menu-enabled'));
-      $form[$mlid]['title']['#markup'] = $item['title']. 
-                                         ' [ Master Number : '.$item['db']['master_number'].
-                                         ', Limit Usage : '.number_format($item['db']['limit_usage']).']';
+      $form[$mlid]['title']['#markup'] = $item['title'];
+      
       $form[$mlid]['weight'] = array(
         '#type' => 'weight',
         '#delta' => 50,
@@ -438,6 +437,18 @@ function _ocs_group_tree_form($tree) {
         '#href' => 'ocs_admin/group/'. $item['mlid']. '/member');
 
       $form[$mlid]['operations'] = $operations;  
+
+      // add additional information
+      $info = array();
+      $info[] = array(
+        '#type' => 'markup',
+        '#markup' => $item['db']['master_number'],
+      );
+      $info[] = array(
+        '#type' => 'markup',
+        '#markup' => number_format( $item['db']['limit_usage']),
+      );
+      $form[$mlid]['info'] = $info;  
     }
 
     if ( isset($data['below'])) {
@@ -520,6 +531,8 @@ function theme_ocs_admin_group_form($variables, $header = NULL)
       $header = array(
         t('Group Name'),
         t('Weight'),
+        t('Master Number'),
+        t('Limit Usage'),
         array( 'data' => t('Operations'), 'colspan' => '3'),
       );
   }
@@ -612,6 +625,11 @@ function ocs_admin_group_member_form( $form, &$form_state, $groupid = NULL, $rec
     $form['ancestor_group_id'] =  array(
         '#type' => 'hidden',
         '#value' => $group['ancestor_group_id'],
+    );
+
+    $form['call_flag'] = array(
+        '#type' => 'hidden',
+        '#value' => 1,
     );
 
     $header = array( 'account_key' => 'Account Key', 'customer_name' => 'Cutomer Name',
@@ -718,6 +736,11 @@ function ocs_admin_member_edit_form( $form, &$form_state, $group, $account_key)
     $form['account_key'] = array(
         '#type' => 'hidden',
         '#value' => $account_key,
+    );
+
+    $form['call_flag'] = array(
+        '#type' => 'hidden',
+        '#value' => 1,
     );
 
     $account = ocs_admin_member_load( $account_key);
@@ -914,7 +937,7 @@ function ocs_admin_member_save( $member)
     db_set_active( 'ocsdb');
     $fields = array();
     foreach( array( 'group_id', 'ancestor_group_id', 'account_key', 'extension', 
-                    'account_usage') as $field) {
+                    'call_flat', 'account_usage') as $field) {
         if ( isset( $member[$field]))
             $fields[ $field] = $member[ $field];
     }
@@ -1720,17 +1743,22 @@ function ocs_admin_extra_add_page($form, &$form_state, $group_id, $arg)
         '#type' => 'hidden',
         '#value' => 3,
     );
+    
+    $form['extra']['call_flag'] = array(
+        '#type' => 'hidden',
+        '#value' => 0,
+    );
+
 
     $form['extra']['ancestor_group_id'] = array(
         '#type' => 'hidden',
         '#value' => $group_id,
     );
 
-
     $form['extra']['account_key'] = array(
         '#type' => 'textfield',
         '#title' => 'Extra Number',
-        '#maxlength' => 64,
+        '#maxlength' => 24,
         '#size' => 30,
         '#required' => TRUE,
     );
@@ -1766,7 +1794,8 @@ function ocs_admin_extra_add_page_submit($form, &$form_state)
     db_set_active( 'ocsdb');
     $extra = $form_state['values'];
     $fields = array();
-    foreach( array( 'group_id', 'group_type', 'ancestor_group_id', 'account_key', 'description') as $field) {
+    foreach( array( 'group_id', 'group_type', 'ancestor_group_id', 'account_key', 
+                    'call_flag', 'description') as $field) {
         if ( isset( $extra[$field]))
             $fields[ $field] = $extra[ $field];
     }
@@ -1775,6 +1804,7 @@ function ocs_admin_extra_add_page_submit($form, &$form_state)
         $default_value = array (
             'group_id' => $fields['group_id'],
             'group_type' => $fields['group_type'],
+            'call_flag' => $fields['call_flag'],
             'ancestor_group_id' => $fields['ancestor_group_id'],
             'account_key' => $fields['account_key'],
             'description' => $fields['description'],

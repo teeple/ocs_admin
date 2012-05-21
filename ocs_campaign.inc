@@ -465,7 +465,7 @@ function ocs_admin_campaign_rule_theme( $form)
 
 		  $row = array();
 		  $row[] = array( 'data' => $element['description'], 'colspan' => '3', 
-            'class' => array('description', 'bd-top'));
+            'class' => array('event-name', 'bd-top'));
           $row = array_merge( $row, _operation_list( $element['operations']));
 		  $rows[] = $row;
 
