@@ -53,12 +53,13 @@ class OcsRule {
     function load( $rule_id) {
         db_set_active( 'ocsdb');
 
-        $query = db_select( 'ocs_campaign_rules', 'c');
+        $query = db_select( 'ocs_rules', 'c');
         $result = $query->condition( 'c.rule_id', $rule_id, '=')
             ->fields( 'c')
             ->execute()
             ->fetch();
 
+        dpm( $result, 'rule');
         $this->rule = $result;
         $this->load_conditions();
         $this->load_actions();
@@ -68,12 +69,17 @@ class OcsRule {
 
     function event_id() 
     {
-        return isset( $this->rule) ? $this->rule->event_id : NULL;
+        // key format :    campaign:<id>:event:<id>
+        $list = explode( ':', $this->rule->rule_key);
+        if ( count( $list) == 4 && $list[2] == 'event') return $list[3];
+        return NULL;
     }
 
     function campaign_id()
     {
-        return isset( $this->rule) ? $this->rule->campaign_id : NULL;
+        $list = explode( ':', $this->rule->rule_key);
+        if ( count( $list) == 4 && $list[0] == 'campaign') return $list[1];
+        return NULL;
     }
 
     function rule_name()
@@ -101,28 +107,29 @@ class OcsRule {
         $form = array();
 
 		$operations = array();
-		$t_arg = array( '@campaign' => $this->rule->campaign_id, '@rule' => $this->rule->rule_id, 
-            '@event' => $this->rule->event_id);
+		$t_arg = array( '@rule' => $this->rule->rule_id);
         $q_arg['query']['rule_name'] = $this->rule->rule_name;
+        $q_arg['query']['redirect'] = current_path();
+        $q_arg['query']['rule_key'] = $this->rule->rule_key;
 
         $operations['add'] = array( 
             '#type' => 'link',
             '#title' => t('Add'),
-            '#href' => t( 'ocs_admin/campaign/@campaign/event/@event/rule/add', $t_arg),
+            '#href' => t( 'ocs_admin/rule/add'),
             '#options' => $q_arg,
         );
         
 		$operations['delete'] = array( 
 		    '#type' => 'link',
 		    '#title' => t('Delete'),
-		    '#href' => t( 'ocs_admin/campaign/@campaign/rule/@rule/delete', $t_arg),
+		    '#href' => t( 'ocs_admin/rule/@rule/delete', $t_arg),
             '#options' => $q_arg,
 		  );
 
 		$operations['edit'] = array( 
 		    '#type' => 'link',
 		    '#title' => t('Edit'),
-		    '#href' => t( 'ocs_admin/campaign/@campaign/rule/@rule/edit', $t_arg),
+		    '#href' => t( 'ocs_admin/rule/@rule/edit', $t_arg),
             '#options' => $q_arg,
 		  );
 
@@ -170,7 +177,7 @@ class OcsRule {
         $idx = 0;
         $white_cell = array( 'data' => '', 'class' => array( 'white-cell'));
         $no_cond = count($this->conditions);
-        $t_arg = array( '@campaign' => $this->rule->campaign_id, '@rule' => $this->rule->rule_id);
+        $t_arg = array( '@campaign' => $this->campaign_id(), '@rule' => $this->rule->rule_id);
 
 //        dpm( $this->conditions, 'conds');
         foreach( $this->conditions as $conds) {
@@ -226,7 +233,7 @@ class OcsRule {
         }
 
         if ( $no_cond == 0) {
-            $t_arg = array( '@campaign' => $this->rule->campaign_id, '@rule' => $this->rule->rule_id);
+            $t_arg = array( '@campaign' => $this->campaign_id(), '@rule' => $this->rule->rule_id);
             $rows[] = array( 
                 $white_cell,
                 array('data' => 'Conditions'),
@@ -273,7 +280,7 @@ class OcsRule {
         $rows = array();
         $white_cell = array( 'data' => '', 'class' => array( 'white-cell'));
         $no_action = count( $this->actions);
-        $t_arg = array( '@campaign' => $this->rule->campaign_id, '@rule' => $this->rule->rule_id);
+        $t_arg = array( '@campaign' => $this->campaign_id(), '@rule' => $this->rule->rule_id);
 
 //        dpm( $this->actions, 'actions');
 
@@ -356,9 +363,11 @@ class OcsRule {
     }
 
 
-    function render( $arg = NULL)
+    function table_rows( $arg = array())
     {
         $rows = array();
+
+        if ( empty( $this->rule)) return $rows;
 
         // first, render rule & operations
         $row = array();
@@ -381,7 +390,7 @@ class OcsRule {
     }
 }
 
-class OcsCampaign
+class OcsCampaignRules
 {
     private $rules;
 
@@ -393,8 +402,8 @@ class OcsCampaign
         db_set_active('ocsdb');
 
         // load all rules data
-        $query = db_select( 'ocs_campaign_rules', 'c');
-        $result = $query->condition( 'c.campaign_id', $campaign_id, '=')
+        $query = db_select( 'ocs_rules', 'c');
+        $result = $query->condition( 'c.rule_key', t('campaign:!id%', array( '!id' => $campaign_id)), 'like')
             ->fields( 'c')
             ->execute();
 
@@ -410,5 +419,47 @@ class OcsCampaign
     function rules()
     {
         return $this->rules;
+    }
+}
+
+class OcsGroupRules
+{
+    private $rules;
+
+    function load( $group_id) 
+    {
+        db_set_active('ocsdb');
+
+        // load all rules data
+        $query = db_select( 'ocs_rules', 'c');
+        $result = $query->condition( 'c.rule_key', t('group:!id', array( '!id' => $group_id)), '=')
+            ->fields( 'c')
+            ->execute();
+
+        $this->rules = array();
+        while( $record = $result->fetch())
+        {
+            $this->rules[ $record->rule_id] = new OcsRule( $record);
+        }
+
+        db_set_active( 'default');
+    }
+
+    function rules()
+    {
+        return $this->rules;
+    }
+
+    function render()
+    {
+        $rows = array();
+
+        foreach( $this->rules as $rule) {
+            $rows = array_merge( $rows, $rule->table_rows());
+        }
+
+        dpm( $rows, 'rows');
+
+        return theme( 'table', array( 'header' => array(), 'rows' => $rows));
     }
 }

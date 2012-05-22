@@ -134,7 +134,7 @@ function ocs_admin_campaign_rule_theme( $form)
             // list conditions and actions of each rule
             foreach( $form['#event'][$event_id]['rule'] as $rule) {
 
-                $rows = array_merge( $rows, $rule->render( array( 'query' => 
+                $rows = array_merge( $rows, $rule->table_rows( array( 'query' => 
                     array( 'event_name' => $element['#event_name']))));
             }
         }

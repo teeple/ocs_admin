@@ -69,23 +69,17 @@ function ocs_admin_campaign_action_form( $form, &$form_state, $campaign_id, $rul
 		'#suffix' => '</div>',
 		);
 
-	$action = node_load( $selected_action);
-    list( $paramlist, $options, $selected) = ocs_admin_get_param_list( $action, $rule_id);
-    dpm( $paramlist, 'paramlist');
+    $params = new OcsParam;
+    $params->load( $selected_action, $rule_id);
 
-    $list = array();
-	foreach( $action->field_ocs_param_ref['und'] as $param) {
-		$node = node_load( $param['target_id']);
-		$key = $rule_id . ':' . $param['target_id'];
-        $list[] = $key;
-
-		$form['param'][$key] = ocs_admin_get_param_form( $paramlist, $key);
+    foreach( $params->keylist() as $key) {
+        $form['param'][$key] = $params->get_form( $key);
         if ( isset($edit_action) && isset( $edit_action['param'][$key]))  {
             $form['param'][$key]['#default_value'] = $edit_action['param'][$key]['value'];
         }
-	}
-	$form['#paramlist'] = $paramlist;
-	$form['#param_name_list'] = $list;
+    }
+
+	$form['#param_name_list'] = $params->keylist();
 
     $form['actions'] = array('#type' => 'actions');
     $form['actions']['submit'] = array(

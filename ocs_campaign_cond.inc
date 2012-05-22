@@ -63,12 +63,12 @@ function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id, $r
 
 	$params = &drupal_static( __FUNCTION__ . 'params', NULL);
 	if ( empty( $params)) {
-		$params = new OcsEventParam;
+		$params = new OcsParam;
         $params->load( $event_id, $rule_id);
 
 //		dpm( $params, 'params');
 
-        if ( ! isset( $selected_param)) $selected_param = $params->selected;
+        if ( ! isset( $selected_param)) $selected_param = $params->selected();
 //        dpm( $paramlist, 'paramlist');
 	}
 
@@ -100,7 +100,7 @@ function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id, $r
     $form['container']['param']['param'] = array(
         '#type' => 'select',
         '#title' => t('Parameter'),
-        '#options' => $params->options,
+        '#options' => $params->options(),
         '#default_value' => $selected_param,
         '#ajax' => array(
             'callback' => 'ocs_admin_ajax_change_param',
@@ -488,7 +488,7 @@ function ocs_admin_campaign_rule_load( $rule_id)
 {
     db_set_active( 'ocsdb');
 
-    $query = db_select( 'ocs_campaign_rules', 'c');
+    $query = db_select( 'ocs_rules', 'c');
     $result = $query->condition( 'c.rule_id', $rule_id, '=')
         ->fields( 'c')
         ->execute()
@@ -508,11 +508,11 @@ function ocs_admin_ajax_add_campaign_rule( $campaign_id, $event_id, $js)
 {
     // add a new rule
     $rule = array(
-        'campaign_id' => $campaign_id,
-        'event_id' => $event_id,
+        'rule_key' => 'campaign:' . $campaign_id . 'event:' . $event_id,
+        'rule_name' => 'Campaign Rule',
     );
 
-    ocs_admin_campaign_rule_save( $rule);
+    ocs_admin_rule_save( $rule);
 
 	$form = drupal_get_form( 'ocs_admin_campaign_rule_form', $campaign_id);
 
@@ -531,30 +531,22 @@ function ocs_admin_ajax_add_campaign_rule( $campaign_id, $event_id, $js)
 	}
 }
 
-function ocs_admin_add_campaign_rule_form( $form, &$form_state, $campaign_id, $event_or_rule_id, $op = NULL)
+function ocs_admin_add_rule_form( $form, &$form_state, $rule_id = NULL, $op = NULL)
 {
-    $form['#campaign_id'] = $campaign_id;
-
-	$form['event'] = array(
-		'#type' => 'item',
-		'#title' => t( 'Event : <em>@name</em>', array('@name' => strip_tags($_GET['event_name']))), 
-	);
+    $form['#key'] = $_GET['rule_key'];
 
     $form['rule_name'] = array(
         '#type' => 'textfield',
         '#title' => 'Rule Name',
         '#size' => 30,
     );
+    $form['#rule_id'] = $rule_id;
 
     if ( $op == 'edit') {
         // read rule
-        $rule = ocs_admin_campaign_rule_load( $event_or_rule_id);
+        $rule = ocs_admin_campaign_rule_load( $rule_id);
         dpm( $rule, 'rule');
         $form['rule_name']['#default_value'] = $rule['rule_name'];
-        $form['#rule_id'] = $event_or_rule_id;
-    }
-    else {
-        $form['#event_id'] = $event_or_rule_id;
     }
 
 	$form['actions'] = array( 
@@ -572,35 +564,36 @@ function ocs_admin_add_campaign_rule_form( $form, &$form_state, $campaign_id, $e
 		'#value' => t('Cancel'),
 	);
 
-
     return $form;
 }
 
-function ocs_admin_add_campaign_rule_form_validate( $form, &$form_state)
+function ocs_admin_add_rule_form_validate( $form, &$form_state)
 {
     $values = $form_state['values'];
-    if ( empty( $values['rule_name'])) {
-        form_set_error( 'rule_name', 'Invalid rule name.');
+    if ( $values['op'] != 'Cancel') {
+        if ( empty( $values['rule_name'])) {
+            form_set_error( 'rule_name', 'Invalid rule name.');
+        }
     }
 }
 
 
-function ocs_admin_add_campaign_rule_form_submit( $form, &$form_state)
+function ocs_admin_add_rule_form_submit( $form, &$form_state)
 {
-    if ( $form_state['values']['op'] != 'Cancel') {
+    $values = $form_state['values'];
+    if ( $values['op'] != 'Cancel') {
         // add a new rule
         $rule = array(
-            'campaign_id' => $form['#campaign_id'],
-            'rule_name' => $form_state['values']['rule_name'],
+            'rule_id' => $form['#rule_id'],
+            'rule_key' => $form['#key'],
+            'rule_name' => $values['rule_name'],
         );
-        if ( isset( $form['#event_id'])) $rule['event_id'] = $form['#event_id'];
-        if ( isset( $form['#rule_id'])) $rule['rule_id'] = $form['#rule_id'];
 
-//        dpm( $rule, 'rule');
-        ocs_admin_campaign_rule_save( $rule);
+        ocs_admin_rule_save( $rule);
     }
 
-	$form_state['redirect'] = 'ocs_admin/campaign/' . $form['#campaign_id'] . '/rule';
+    $list = explode( ':', $form['#key']);
+    $form_state['redirect'] = t( 'ocs_admin/@name/@id/rule', array( '@name' => $list[0], '@id' => $list[1]));
 }
 
 
@@ -613,8 +606,8 @@ function ocs_admin_campaign_conditions_load_all( $campaign_id)
 
     // get group information
     $query = db_select( 'ocs_campaign_conditions', 'c');
-    $query->join( 'ocs_campaign_rules', 'r', 'r.rule_id = c.rule_id');  // join with rules table
-    $result = $query->condition( 'r.campaign_id', $campaign_id, '=')
+    $query->join( 'ocs_rules', 'r', 'r.rule_id = c.rule_id');  // join with rules table
+    $result = $query->condition( 'r.rule_key', t( 'campaign:!id%', array( '!id' => $campaign_id)), 'like')
         ->fields( 'c')
         ->execute();
 
@@ -629,14 +622,14 @@ function ocs_admin_campaign_conditions_load_all( $campaign_id)
     return $records;
 }
 
-function ocs_admin_campaign_rule_save( $rule)
+function ocs_admin_rule_save( $rule)
 {
     db_set_active('ocsdb');
 
-	$result = db_merge( 'ocs_campaign_rules')
-        ->key( array( 'rule_id' => isset($rule['rule_id']) ? $rule['rule_id'] : NULL))
-		->fields( $rule)
-		->execute();
+    $result = db_merge( 'ocs_rules')
+        ->key( array( 'rule_id' => $rule['rule_id'] ))
+        ->fields( $rule)
+        ->execute();
     dpm( $result, 'db_merge result');
 
     db_set_active( 'default');
@@ -653,7 +646,7 @@ function ocs_admin_campaign_rule_delete( $rule_id)
 
     try {
         // delete rules
-        $result = db_delete( 'ocs_campaign_rules')
+        $result = db_delete( 'ocs_rules')
             ->condition( 'rule_id', $rule_id, '=')
             ->execute();
 
@@ -677,14 +670,14 @@ function ocs_admin_campaign_rule_delete( $rule_id)
 	return $result;
 }
 
-function ocs_admin_campaign_rule_delete_confirm( $form, &$form_state, $campaign_id, $rule_id)
+function ocs_admin_rule_delete_confirm( $form, &$form_state, $rule_id)
 {
     $name = isset( $_GET['rule_name']) ? $_GET['rule_name'] : 'Rule ID:'.$rule_id;
-    $form['#campaign_id'] = $campaign_id;
+    $form['#redirect'] = $_GET['redirect'];
     $form['#rule_id'] = $rule_id;
 
     $caption = '<p>' . 
-            t('<strong>Warning:</strong> The "@name" will be deleted from the Campaign.',
+            t('<strong>Warning:</strong> The Rule "@name" will be deleted.',
                 array( '@name' => $name)) .
             '</p>';
 
@@ -692,13 +685,12 @@ function ocs_admin_campaign_rule_delete_confirm( $form, &$form_state, $campaign_
 
     return confirm_form( $form, t('Are you sure to delete the rule "%key"?',
         array( '%key' => $name)),
-        'ocs_admin/campaign/' . $campaign_id . '/rule',
+        $form['#redirect'],
         $caption, t('Delete'));
 }
 
-function ocs_admin_campaign_rule_delete_confirm_submit( $form, &$form_state)
+function ocs_admin_rule_delete_confirm_submit( $form, &$form_state)
 {
-    $campaign_id = $form['#campaign_id'];
     $rule_id = $form['#rule_id'];
 
     ocs_admin_campaign_rule_delete( $rule_id);
@@ -706,7 +698,7 @@ function ocs_admin_campaign_rule_delete_confirm_submit( $form, &$form_state)
     drupal_set_message( t('The Rule %key has been removed from the Campaign.', 
 			array( '%key' => $rule_id)));
 
-    $form_state['redirect'] = 'ocs_admin/campaign/' . $campaign_id . '/rule';
+    $form_state['redirect'] = $form['#redirect'];
 }
 
 

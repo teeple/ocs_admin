@@ -4,13 +4,15 @@ module_load_include( 'inc', 'ocs_admin', 'ocs_common');
 
 // manages Parameters that belongs to each Event
 // 
-class OcsEventParam 
+class OcsParam 
 { 
-    var $event_id;
-    var $params;
-    var $options;
-    var $selected;
-    var $oplist = array(
+    private $nid;
+    private $params;
+    private $options;
+    private $selected;
+    private $list;      // parameter name list
+
+    private $oplist = array(
         OCS_PARAM_TYPE_STRING => array(
             '=', 'starts', 
             ),
@@ -34,18 +36,14 @@ class OcsEventParam
             ),
     );
 
-    function OcsEventParam()
+    function load( $nid, $rule_id)
     {
-    }
-
-    function load( $event_id, $rule_id)
-    {
-        $this->event_id = $event_id;
+        $this->nid = $nid;
 
         $paramlist = array();
         $options = array();
 
-        $node = node_load( $event_id);
+        $node = node_load( $nid);
 
         foreach( $node->field_ocs_param_ref['und'] as $param) {
             $para = node_load( $param['target_id']);
@@ -53,6 +51,10 @@ class OcsEventParam
 
             // store select options
             $key = $rule_id . ':' . $param['target_id'];
+
+            // store key
+            $this->list[] = $key;
+
             $value = $para->title;
             $options[ $node->title][ $key] = $value;
             // store parameter info
@@ -179,4 +181,18 @@ class OcsEventParam
         return isset( $this->params[$value]) ? $this->params[$value] : NULL;
     }
 
-}  
+    function selected()
+    {
+        return $this->selected;
+    }
+
+    function options()
+    {
+        return $this->options;
+    }
+
+    function keylist()
+    {
+        return $this->list;
+    }
+}

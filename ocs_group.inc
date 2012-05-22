@@ -1,5 +1,7 @@
 <?php
 
+require_once( 'ocs_rule.inc');
+
 /*
 ** group over view page
 ** NOT USED. use views for this operation
@@ -56,36 +58,31 @@ function ocs_admin_group_edit_form( $form, &$form_state, $type, $groupid = NULL)
 {
     if ( isset( $groupid)) $group = group_load( $groupid);
     $form = array();
-    $form['section'] = array(
-        '#type' => 'fieldset',
-        '#description' => 'Input or select parameters to create an group.',
-    );
-    
-    $form['section']['group'] = array(
+   
+    $form['group'] = array(
         '#type' => 'fieldset',
         '#title' => t('Group'),
         '#collapsible' => TRUE,
         '#collapsed' => FALSE,
         '#description' => 'Click the <em>Search</em> button to find a account.',
-        '#attributes' => array( 'class' => array( 'column')),
     );
 
-    $form['section']['group']['group_id'] = array(
+    $form['group']['group_id'] = array(
         '#type' => 'hidden',
         '#value' => NULL,
     );
 
-    $form['section']['group']['parent_group_id'] = array(
+    $form['group']['parent_group_id'] = array(
         '#type' => 'hidden',
         '#value' => 0,
     );
 
-    $form['section']['group']['ancestor_group_id'] = array(
+    $form['group']['ancestor_group_id'] = array(
         '#type' => 'hidden',
         '#value' => 0,
     );
 
-    $form['section']['group']['group_name'] = array(
+    $form['group']['group_name'] = array(
         '#type' => 'textfield',
         '#title' => 'Name',
         '#description' => t('Enter Group Name'),
@@ -93,76 +90,63 @@ function ocs_admin_group_edit_form( $form, &$form_state, $type, $groupid = NULL)
         '#size' => 30,
     );
 
-    $form['section']['group']['master_number'] = array(
+    $form['group']['limit_usage'] = array(
         '#type' => 'textfield',
+        '#title' => 'Limit Usage',
+        '#description' => t('Enter group limit usage'),
+        '#maxlength' => 24,
+        '#size' => 30,
+    );
+
+    $form['group']['item'] = array(
+        '#type' => 'item',
         '#title' => 'Master Number',
-        '#description' => t('Enter or select a master number to be used'),
+    );
+
+    $form['group']['container'] = array(
+        '#prefix' => '<div class="container-inline form-item">',
+        '#suffix' => '</div>'
+    );
+
+    $form['group']['container']['master_number'] = array(
+        '#type' => 'textfield',
         '#maxlength' => 24,
         '#size' => 30,
     );
     
-    $form['section']['group']['account_search'] = array(
+    $form['group']['container']['account_search'] = array(
         '#type' => 'submit',
         '#value' => 'Search Account',
     );
     
-    if ($group['parent_group_id'] != '0') {
-        $form['section']['discount'] = array(
-            '#type' => 'fieldset',
-            '#title' => t('Discout Information'),
-            '#collapsible' => TRUE,
-            '#collapsed' => FALSE,
-            '#attributes' => array( 'class' => array( 'column')),
+    $form['discount'] = array(
+        '#type' => 'fieldset',
+        '#title' => t('Discout Rule'),
+        '#collapsible' => TRUE,
+        '#collapsed' => FALSE,
+    );
+
+    dpm( $group, 'group');
+    $rules = new OcsGroupRules;
+    $rules->load( $groupid);
+
+    dpm( $rules, 'rules');
+
+    if ( count( $rules->rules()) == 0) {
+        $form['discount']['rule'] = array(
+            '#type' => 'markup',
+            '#markup' => t('There are no rules yet. <a href="@url">Add Rules.</a>',
+                array( '@url' => url( 'ocs_admin/rule/add', 
+                    array( 'query' => array( 
+                        'redirect' => current_path(),
+                        'name' => $group['group_name'],
+                        'rule_key' => 'group:'.$groupid))))),
         );
-
-        $form['section']['discount']['limit_usage'] = array(
-            '#type' => 'textfield',
-            '#title' => 'Limit Usage',
-            '#description' => t('Enter group limit usage'),
-            '#maxlength' => 24,
-            '#size' => 30,
-        );
-
-        $hour = array();
-            for( $i = 0; $i < 24; $i++){
-                $hour[$i] = str_pad($i, 2, '0', STR_PAD_LEFT);
-        }
-
-        $min = array();
-            for( $i = 0; $i < 60; $i++){
-                $min[$i] = str_pad($i, 2, '0', STR_PAD_LEFT);
-        }
-
-        $form['section']['discount']['from_hour'] = array(
-            '#type' => 'select',//'select', 
-            '#title' => t('Discount Start Time'),
-            '#attributes' => array( 'class' => array( 'column')),
-            '#options' => $hour,
-        );
-
-        $form['section']['discount']['from_min'] = array(
-            '#type' => 'select', 
-            '#title_display' => 'invisible',
-            '#options' => $min,
-        );
-
-        $form['section']['discount']['to_hour'] = array(
-            '#type' => 'select',//'select', 
-            '#title' => t('Discount End Time'),
-            '#attributes' => array( 'class' => array( 'column')),
-            '#options' => $hour,
-        );
- 
-        $form['section']['discount']['to_min'] = array(
-            '#type' => 'select', 
-            '#options' => $min,
-        );
-
-        $form['section']['discount']['discount_rate'] = array(
-            '#type' => 'textfield',
-            '#title' => t('Discount Rate(%)'),
-            '#size' => 10,
-            '#max_length' => 3,
+    }
+    else {
+        $form['discount']['rule'] = array(
+            '#type' => 'markup',
+            '#markup' => $rules->render(),
         );
     }
 
@@ -178,17 +162,19 @@ function ocs_admin_group_edit_form( $form, &$form_state, $type, $groupid = NULL)
     );
 
     if ( isset( $groupid)) {
-        $form['section']['group']['group_id']['#value'] = $group['group_id'];
-        $form['section']['group']['ancestor_group_id']['#value'] = $group['ancestor_group_id'];
-        $form['section']['group']['parent_group_id']['#value'] = $group['parent_group_id'];
-        $form['section']['group']['group_name']['#default_value'] = $group['group_name'];
-        $form['section']['group']['master_number']['#default_value'] = $group['master_number'];
-        $form['section']['discount']['limit_usage']['#default_value'] = $group['limit_usage'];
+        $form['group']['group_id']['#value'] = $group['group_id'];
+        $form['group']['ancestor_group_id']['#value'] = $group['ancestor_group_id'];
+        $form['group']['parent_group_id']['#value'] = $group['parent_group_id'];
+        $form['group']['group_name']['#default_value'] = $group['group_name'];
+        $form['group']['master_number']['#default_value'] = $group['master_number'];
+        $form['group']['limit_usage']['#default_value'] = $group['limit_usage'];
+        /*
         $form['section']['discount']['from_hour']['#default_value'] = (int)substr($group['from_time'], 0, 2);
         $form['section']['discount']['from_min']['#default_value'] = (int)substr($group['from_time'], 2, 2);
         $form['section']['discount']['to_hour']['#default_value'] = (int)substr($group['to_time'], 0, 2);
         $form['section']['discount']['to_min']['#default_value'] = (int)substr($group['to_time'], 2, 2);
         $form['section']['discount']['discount_rate']['#default_value'] = $group['discount_rate'];
+        */
         $_SESSION['form_mode'] = 'M';
         $_SESSION['group_name'] = $group['group_name'];
         $_SESSION['limt_usage'] = $group['limit_usage'];
@@ -200,20 +186,22 @@ function ocs_admin_group_edit_form( $form, &$form_state, $type, $groupid = NULL)
 
 function ocs_admin_group_edit_form_validate($form, &$form_state)
 {  
-    $group = $form_state['values']['ancestor_group_id'];
-    $master_number = $form_state['values']['master_number'];
-    // check master number another group 
-    if (!empty($master_number)) {
-        $group_id = ocs_admin_master_number_load($group, $master_number);
-        if (!empty($group_id)) {
-            form_set_error( 'master number', 
-                            'Master number already exsits another group [group name:'.$group_id.']');
+    if ( $form_state['values']['op'] == 'Save') {
+        $group = $form_state['values']['ancestor_group_id'];
+        $master_number = $form_state['values']['master_number'];
+        // check master number another group 
+        if (!empty($master_number)) {
+            $group_id = ocs_admin_master_number_load($group, $master_number);
+            if (!empty($group_id)) {
+                form_set_error( 'master number', 
+                                'Master number already exsits another group [group name:'.$group_id.']');
+            }
         }
-    }
-    
-    $usage = ocs_admin_limit_usage($form_state);
-    if ($usage > 0) {
-        form_set_error( 'limit usage', 'Please check the members total limit usage');
+        
+        $usage = ocs_admin_limit_usage($form_state);
+        if ($usage > 0) {
+            form_set_error( 'limit usage', 'Please check the members total limit usage');
+        }
     }
 }
 
@@ -222,6 +210,7 @@ function ocs_admin_group_edit_form_submit( $form, &$form_state)
     $group = $form_state['values'];
     if ( $form_state['values']['op'] == 'Search Account') {
         $query = array(
+            'redirect' => current_path(),
             'ancestor_group_id' => $form_state['values']['ancestor_group_id'],
         );
         
@@ -334,43 +323,48 @@ function ocs_admin_db_get_group_count( $group_id, $master_number)
 */
 function ocs_admin_group_form( $form, &$form_state, $groupid)
 {
-  $group = group_load( $groupid);
-  $form['#attached']['css'] = array(drupal_get_path('module', 'ocs_admin') . '/ocs_admin.css');
+    $group = group_load( $groupid);
+    $form['#attached']['css'] = array(drupal_get_path('module', 'ocs_admin') . '/ocs_admin.css');
 
-  $form['#description'] = '<p>Change the hierarchy of subgroups by moving records.<br>'
+    $form['#description'] = '<p>Change the hierarchy of subgroups by moving records.<br>'
         .'Click <em>Edit</em> button to change its properties.<br>'
         .'Click <em>Delete</em> button to remove the subgroup.</p>';
 
-  // get all subgroups
-  $subgroups = ocs_admin_subgroup_load( $group['group_id']);
-  $tree = ocs_admin_build_tree( $subgroups, array( 
-    'title' => 'group_name',
-    'plid' => 'parent_group_id', 
-    'mlid' => 'group_id',
-    'master_number' => 'master_number'), -1);
+    // get all subgroups
+    $subgroups = ocs_admin_subgroup_load( $group['group_id']);
+    dpm( $subgroups, 'subgroups');
 
-  $tree = ocs_admin_get_sub_tree( array_shift( $tree));
- // dpm( $tree, 'tree');
+    list( $root, $tree) = ocs_admin_build_tree( $subgroups, array( 
+        'title' => 'group_name',
+        'plid' => 'parent_group_id', 
+        'mlid' => 'group_id',
+        'master_number' => 'master_number'), -1);
 
-  $form = array_merge($form, _ocs_group_tree_form($tree));
+    // insert root node
+    $form['#root'] = $root;
 
-  if (element_children($form)) {
-    $form['actions'] = array('#type' => 'actions');
-    $form['actions']['submit'] = array(
-      '#type' => 'submit',
-      '#value' => t('Save configuration'),
-    );
-    $form['actions']['cancel'] = array(
-      '#type' => 'submit',
-      '#value' => t('Cancel'),
-    );
-  }
-  else {
-    $form['#empty_text'] = t('There are no subgroups yet. <a href="@link">Add Subgroup</a>.', 
-        array('@link' => url('ocs_admin/group/'. $group['group_id'] .'/add')));
-  }
+    $tree = ocs_admin_get_sub_tree( array_shift( $tree));
+    // dpm( $tree, 'tree');
 
-  return $form;
+    $form = array_merge($form, _ocs_group_tree_form($tree));
+
+    if (element_children($form)) {
+        $form['actions'] = array('#type' => 'actions');
+        $form['actions']['submit'] = array(
+          '#type' => 'submit',
+          '#value' => t('Save configuration'),
+        );
+        $form['actions']['cancel'] = array(
+          '#type' => 'submit',
+          '#value' => t('Cancel'),
+        );
+    }
+    else {
+        $form['#empty_text'] = t('There are no subgroups yet. <a href="@link">Add Subgroup</a>.', 
+            array('@link' => url('ocs_admin/group/'. $group['group_id'] .'/add')));
+    }
+
+    return $form;
 }
 
 /*
@@ -522,22 +516,214 @@ function ocs_admin_group_title( $op, $group)
  *
  * @ingroup themeable
  */
-function theme_ocs_admin_group_form($variables, $header = NULL) 
+function theme_ocs_admin_group_form($variables)
 {
   
-  $form = $variables['form'];
+    $form = $variables['form'];
 
-  if ( ! isset( $header)) {
-      $header = array(
+    $header = array(
+        t('Group Name'),
+        t('Master Number'),
+        t('Limit Usage'),
+        array( 'data' => t('Operations'), 'colspan' => '3'),
+    );
+
+    // render root node
+    $root = $form['#root'];
+    dpm( $root, 'root');
+
+    $row = array();
+    $row[] = array( 'data' => $root['title']);
+    $row[] = array( 'data' => $root['db']['master_number']);
+    $row[] = array( 'data' => $root['db']['limit_usage']);
+      
+    $t_arg = array( '@group' => $root['db']['group_id']);
+    $q_arg = array( 'query' => array( 'name' => 'my group'));
+
+    $operations = array();
+    $operations['edit'] = array( 
+        '#type' => 'link',
+        '#title' => t('edit'),
+        '#href' => t( 'ocs_admin/group/@group/edit', $t_arg),
+        '#options' => $q_arg,
+        );
+
+    $operations['list'] = array(
+        '#type' => 'link',
+        '#title' => t('members'),
+        '#href' => t( 'ocs_admin/group/@group/member', $t_arg),
+    );
+
+
+    foreach( $operations as $op) {
+        $row[] = array( 'data' => drupal_render($op),
+            'class' => array('menu-operations'));
+    }
+
+    $rows = array( $row);
+
+    $output = '<br><h1>Master Group</h1>';
+    $output .= theme('table', array( 'header' => $header, 'rows' => $rows));
+
+    $header = array(
         t('Group Name'),
         t('Weight'),
         t('Master Number'),
         t('Limit Usage'),
         array( 'data' => t('Operations'), 'colspan' => '3'),
+    );
+
+    $output .= '<hr><h1>Sub Groups</h1>';
+    $output .= ocs_admin_tree_table_theme( $form, $header);
+
+    return $output;
+}
+
+
+/*
+** @param
+    parent_field_name : field name that points parent node
+    myid_name : field name that identifies my node
+*/
+function _ocs_admin_build_path( $list, &$node, $meta_field)
+{
+    $parent = $node[ $meta_field['plid']];
+    $path = array( $node[ $meta_field['mlid']]);
+    
+    if ( $parent == '0') {
+        return $path;
+    }
+    else {
+        if ( isset($list[$parent])) {
+            return array_merge( _ocs_admin_build_path( $list, $list[$parent], $meta_field), 
+                    $path);
+        }
+        else {
+            // parent not found
+            // reset parent group id
+            $node[ $meta_field['mlid']] = 0;
+            return $path;
+        }
+    }
+}
+
+function _ocs_admin_build_tree( &$tree, $path, $item)
+{
+    if ( count( $path) == 1) {
+        $tree[$item['mlid']] = $item;   // root node
+        return;
+    }
+
+    // remove the first node
+    $elm = $path[0];
+    unset( $path[0]);
+
+    return _ocs_admin_build_tree( $tree[$elm]['below'], array_values( $path), $item);
+}
+
+
+/*
+    build tree form
+    @param meta_field     meta data for building tree
+*/
+function ocs_admin_build_tree( $nodes, $meta_field, $depth_offset = 0)
+{
+  // first calculate the depth
+  $depthlist = array();
+  foreach( $nodes as $node) {
+      $path = _ocs_admin_build_path( $nodes, $node, $meta_field);
+
+      $depth = count( $path);
+      $depthlist[ $depth][] = array(
+        'db' => $node,
+        'title' => $node[ $meta_field['title']],
+        'mlid' => $node[ $meta_field['mlid']],
+        'plid' => $node[ $meta_field['plid']],
+        'depth' => $depth + $depth_offset,
+        'path' => $path,
+        'below' => array(),
       );
   }
+//  dpm( $depthlist, 'depthlist');
 
-  return ocs_admin_tree_table_theme( $form, $header);
+  // build tree
+  $depth = 1;
+  $tree = array();
+  while( isset( $depthlist[$depth])) {
+    // check each depth as one by one
+    foreach( $depthlist[ $depth] as $item) {
+        // traverse path
+  //      dpm( $item['item']['path'], 'path');
+        _ocs_admin_build_tree( $tree, $item['path'], $item);
+    }
+
+    $depth = $depth +1;
+  }
+
+    // depthlist[1][0] is the root node
+    return array( $depthlist[1][0], $tree);
+}
+
+
+function ocs_admin_tree_table_theme( $form, $header)
+{
+
+  drupal_add_tabledrag('menu-overview', 'match', 'parent', 'menu-plid', 'menu-plid', 'menu-mlid', TRUE, MENU_MAX_DEPTH - 1);
+  drupal_add_tabledrag('menu-overview', 'order', 'sibling', 'menu-weight');
+
+  $rows = array();
+  foreach (element_children($form) as $mlid) {
+//    dpm( $mlid, 'mlid');
+    if (isset( $form[$mlid]['mlid'])) {
+      $element = &$form[$mlid];
+      $operations = array();
+      foreach( element_children( $element['operations']) as $op) {
+          $operations[] = array( 'data' => drupal_render($element['operations'][$op]),
+            'class' => array('menu-operations'));
+      }
+
+      // Add special classes to be used for tabledrag.js.
+      $element['plid']['#attributes']['class'] = array('menu-plid');
+      $element['mlid']['#attributes']['class'] = array('menu-mlid');
+      $element['weight']['#attributes']['class'] = array('menu-weight');
+
+      // Change the parent field to a hidden. This allows any value but hides the field.
+      $element['plid']['#type'] = 'hidden';
+
+      $row = array();
+      $row[] = theme('indentation', array('size' => $element['#item']['depth'] - 1)) . drupal_render($element['title']);
+      $row[] = drupal_render($element['weight']) . drupal_render($element['plid']) . drupal_render($element['mlid']);
+
+      // master number
+      $row[] = array( 'data' => drupal_render($element['info'][0]), 'class' => array('wide-width'));
+
+      // limit usage
+      $row[] = array( 'data' => drupal_render($element['info'][1]), 'class' => array('wide-width'));
+
+      $row = array_merge( $row, $operations);
+
+      $row = array_merge(array('data' => $row), $element['#attributes']);
+      $row['class'][] = 'draggable';
+      $rows[] = $row;
+    }
+  }
+  if (empty($rows)) {
+    $rows[] = array(array('data' => $form['#empty_text'], 'colspan' => '7'));
+  }
+
+  $footer = ( isset($form['#footer'])) ?  array(array('data' => $form['#footer'], 'colspan' => '7')) : NULL;
+
+  $output = '';
+  if ( isset( $form['#caption'])) {
+      $output .= '<h3>' . $form['#caption'] . '</h3>';
+  } 
+  if ( isset( $form['#descriptoin'])) {
+	  $output .= $form['#description'];
+  }
+  $output .= theme('table', array('header' => $header, 'rows' => $rows, 
+    'footer' => $footer, 'attributes' => array('id' => 'menu-overview')));
+  $output .= drupal_render_children($form);
+  return $output;
 }
 
 
@@ -1174,14 +1360,21 @@ function theme_ocs_admin_member_list( $variables)
     $subgroup = $form['#subgroup'];
     foreach( $subgroup as $sub) {
         if ($sub['parent_group_id'] != 0) {
-            $rows[] =  array( array( 'data' => t('Members of Subgroup <em>@group</em>. 
-                                                  Limit Usage is @limit_usage', 
-                                     array( '@group' => $sub['group_name'],
-                                            '@limit_usage' => number_format($sub['limit_usage'])
-                                            )), 'colspan' => 7));
+//            $rows[] =  array( array( 'data' => t('Members of Subgroup <em>@group</em>. 
+//                                                  Limit Usage is @limit_usage', 
+//                                     array( '@group' => $sub['group_name'],
+//                                            '@limit_usage' => number_format($sub['limit_usage'])
+//                                            )), 'colspan' => 7));
 
             if ( isset( $sub['members'])) {
                 foreach ($sub['members'] as $key ) {
+                    if (empty($rows)) {
+                        $rows[] =  array( array( 'data' => t('Members of Subgroup <em>@group</em>. 
+                                                 Limit Usage is @limit_usage', 
+                                         array( '@group' => $sub['group_name'],
+                                                '@limit_usage' => number_format($sub['limit_usage'])
+                                                )), 'colspan' => 7));
+                    }
                     $elm = &$form['members'][$key];
                     $row = array();
                     $row[] = drupal_render($elm[$key.':group_id']);
@@ -1196,7 +1389,9 @@ function theme_ocs_admin_member_list( $variables)
                 }   
             }
             else {
-                $rows[] =  array( array( 'data' => t( 'No members'), 'colspan' => 7));
+                if (empty($rows)) {
+                    $rows[] =  array( array( 'data' => t( 'No members'), 'colspan' => 7));
+                }
             }
         }
     }
@@ -1347,6 +1542,7 @@ function ocs_admin_group_select($impl, $js=NULL, $type='group', $id=NULL)
 /*************************************
 ** add/edit group information form
 *************************************/
+/* not used from 2012/05/22
 function ocs_admin_group_add_page( $impl = NULL, $arg = NULL, $init = TRUE)
 {
     $impl = '_wizard';
@@ -1512,6 +1708,7 @@ function ocs_admin_group_add_page_wizard_submit( $form, &$form_state)
             $form_state['redirect'] = 'ocs_admin/group/' . $group['ancestor_group_id'] . '/subgroup';
     }
 }
+*/
 
  
 /**************************************
