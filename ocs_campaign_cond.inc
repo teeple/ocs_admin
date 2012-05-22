@@ -1,5 +1,7 @@
 <?php
 
+module_load_include( 'inc', 'ocs_admin', 'ocs_rule');
+module_load_include( 'inc', 'ocs_admin', 'ocs_param');
 
 function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id, $rule_id, $cond_id, $op = NULL)
 {
@@ -39,11 +41,12 @@ function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id, $r
 		'#title' => t( 'Rule : <em>@name</em>', array('@name' => strip_tags($_GET['rule_name']))), 
 	);
 
-	$rule = &drupal_static( __FUNCTION__ . 'rule', array());
+	$rule = &drupal_static( __FUNCTION__ . 'rule', NULL);
     if ( empty( $rule)) {
         // get event info
-        $rule = ocs_admin_campaign_rule_load( $rule_id);
-        if ( empty( $rule)) {
+        $rule = new OcsRule;
+        $rule->load( $rule_id);
+        if ( $rule->isNull()) {
             drupal_set_message( t('Unable to find rule %id.', array( '%id' => $rule_id)), 'error');
             $form['actions'] = array('#type' => 'actions');
             $form['actions']['cancel'] = array(
@@ -56,22 +59,22 @@ function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id, $r
     }
 //    dpm( $rule, 'rule');
 
-	$form['#event_id'] = $event_id = $rule['event_id'];
+	$form['#event_id'] = $event_id = $rule->event_id();
 
-	$options = &drupal_static( __FUNCTION__ . 'options', array());
-	$paramlist = &drupal_static( __FUNCTION__ . 'param', array());
-	if ( empty( $options) || empty( $param)) {
-		$node = node_load( $event_id);
-//		dpm( $node, 'node');
+	$params = &drupal_static( __FUNCTION__ . 'params', NULL);
+	if ( empty( $params)) {
+		$params = new OcsEventParam;
+        $params->load( $event_id, $rule_id);
 
-        list( $paramlist, $options, $selected) = ocs_admin_get_param_list( $node, $rule_id);
-        if ( ! isset( $selected_param)) $selected_param = $selected;
+//		dpm( $params, 'params');
+
+        if ( ! isset( $selected_param)) $selected_param = $params->selected;
 //        dpm( $paramlist, 'paramlist');
 	}
 
 //    dpm( $paramlist, 'param list');
 
-	$form['#paramlist'] = $paramlist;
+	$form['#paramlist'] = $params;
 
     $form['cond_idx'] = array(
         '#type' => 'hidden',
@@ -97,7 +100,7 @@ function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id, $r
     $form['container']['param']['param'] = array(
         '#type' => 'select',
         '#title' => t('Parameter'),
-        '#options' => $options,
+        '#options' => $params->options,
         '#default_value' => $selected_param,
         '#ajax' => array(
             'callback' => 'ocs_admin_ajax_change_param',
@@ -117,7 +120,7 @@ function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id, $r
     $form['container']['param']['operator'] = array(
         '#type' => 'select',
         '#title' => 'Operator',
-        '#options' => _campaign_operator( $paramlist, $selected_param),
+        '#options' => drupal_map_assoc( $params->operators( $selected_param)),
         '#default_value' => isset($condition) ? $condition['operator'] : NULL,
         '#ajax' => array(
             'callback' => 'ocs_admin_ajax_value_type',
@@ -151,8 +154,8 @@ function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id, $r
 
 //    dpm( $direct_input, 'dir input');
     if ( ! $direct_input || $operator == 'between' ) {
-        $form['container']['valueset']['value'] = ocs_admin_get_param_form( $paramlist, $selected_param, $operator);
-        dpm( $form['container']['valueset']['value'], 'direct input');
+        $form['container']['valueset']['value'] = $params->get_form( $selected_param, $operator);
+//        dpm( $form['container']['valueset']['value'], 'direct input');
 
         if ( $operator == 'between') {
             $form['container']['valueset']['value2'] = $form['container']['valueset']['value'];
@@ -208,6 +211,7 @@ function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id, $r
 	return $form;
 }
 
+/*
 function ocs_admin_get_param_form( $paramlist, $param, $operator = NULL)
 {
     $type = _get_param_type( $paramlist, $param);
@@ -337,6 +341,7 @@ function _get_param_type( $paramlist, $selected)
 
     return OCS_PARAM_TYPE_STRING;
 }
+*/
 
 function ocs_admin_ajax_change_param( $form, $form_state)
 {
@@ -356,7 +361,8 @@ function ocs_admin_campaign_add_cond_form_validate( $form, &$form_state)
     if ( $values['direct_input']) {
         // direct input
 
-        $type = _get_param_type( $form['#paramlist'], $values['param']);
+        $params = $form['#paramlist'];
+        $type = $params->type( $values['param']);
         $msg = ocs_admin_check_param_value( $type, $values['value']);
         if ( ! empty( $msg)) {
             form_set_error( 'value', $msg);
@@ -421,27 +427,29 @@ function ocs_admin_campaign_add_cond_form_submit( $form, &$form_state)
 	$values = $form_state['values'];
 	dpm( $values, 'values submit');
 	if ( $values['op'] != 'Cancel') {
+        $params = $form['#paramlist'];
+
 		$list = explode( ':', $values['param']);     // format : 'rule_id:param_id:string'
-        list( $value1, $value1_print) = _get_param_value( $form['#paramlist'], $values['param'], $values['value']);
-        list( $value2, $value2_print) = _get_param_value( $form['#paramlist'], $values['param'], $values['value2']);
+        list( $value1, $value1_print) = $params->get_value( $values['param'], $values['value']);
+        list( $value2, $value2_print) = $params->get_value( $values['param'], $values['value2']);
 		$cond = array(
             'cond_id' => $form['#cond_id'],
 			'rule_id' => $list[0],
 			'cond_idx' => $values['cond_idx'],
 			'param_id' => $list[1] . (isset($list[2]) ? ':'.$list[2] : ''),
-			'param_name' => $form['#paramlist'][ $values['param']],
+			'param_name' => $params->get_param( $values['param']),
 			'operator' => $values['operator'],
 			'direct_input' => $values['direct_input'],
 			'value' => $value1,
 			'value2' => $value2,
             'cond_rule' => t('!para !op !value !value2', array(
-					'!para' =>  _get_param_name( $form['#paramlist'], $values),
+					'!para' =>  _get_param_name( $params, $values),
 					'!op' => $values['operator'],
 					'!value' => $value1_print,
                     '!value2' => ($values['operator'] == 'between') ? ', '. $value2_print : '')),
 			'cond_name' => t( '!counter !para !op !value !value2', array( 
                     '!counter' => isset($values['counter']) ? $values['counter'] : '',
-					'!para' =>  $form['#paramlist'][ $values['param']],
+					'!para' =>  $params->get_param($values['param']),
 					'!op' => $values['operator'],
 					'!value' => $value1_print,
                     '!value2' => ($values['operator'] == 'between') ? 'and '. $value2_print : '')),
@@ -456,17 +464,18 @@ function ocs_admin_campaign_add_cond_form_submit( $form, &$form_state)
 	$form_state['redirect'] = 'ocs_admin/campaign/' . $form['#campaign_id'] . '/rule';
 }
 
-function _get_param_name( $paramlist, $values)
+function _get_param_name( $params, $values)
 {
-    $type = _get_param_type( $paramlist, $values['param']);
+    $type = $params->type( $values['param']);
     if ( $type == OCS_PARAM_TYPE_ACCOUNT_KEY) {
         return isset($values['counter']) ? $values['counter'] : 'unknown';
     }
 
-    return $paramlist[ $values['param']];
+    return $params->get_param( $values['param']);
 }
 
 
+/*
 function _get_param_value( $paramlist, $param, $value)
 {
     $type = _get_param_type( $paramlist, $param);
@@ -492,6 +501,7 @@ function _get_param_value( $paramlist, $param, $value)
 
     return array( $value, $value);
 }
+*/
 
 /*
     save OCS campaign condition

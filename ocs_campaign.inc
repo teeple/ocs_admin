@@ -5,6 +5,8 @@ module_load_include( 'inc', 'ocs_admin', 'ocs_campaign_event');
 module_load_include( 'inc', 'ocs_admin', 'ocs_campaign_cond');
 module_load_include( 'inc', 'ocs_admin', 'ocs_campaign_export');
 
+require_once( 'ocs_rule.inc');
+
 /*
 ** campaign rules form
 */
@@ -20,14 +22,20 @@ function ocs_admin_campaign_rule_form( $form, &$form_state, $campaign_id = NULL)
   // get all events
   //****************************
 
+    $campaign = new OcsCampaign;
+    $campaign->load( $campaign_id);
+
+    dpm( $campaign);
+
+/*
 	$events = ocs_admin_campaign_events_load_all( $campaign_id);
     $conditions = ocs_admin_campaign_conditions_load_all( $campaign_id);
     $actions = ocs_admin_campaign_actions_load_all( $campaign_id);
     dpm( $events, 'all event list');
+    */
 
-	foreach( $events as $rule_id => $rules) {
-        $rule = $rules[0];
-        $event_id = $rule['event_id'];
+	foreach( $campaign->rules() as $rule_id => $rule) {
+        $event_id = $rule->event_id();
         if ( ! isset( $form['#event'][$event_id])) {
             // add new event
             $node = node_load( $event_id);
@@ -54,7 +62,7 @@ function ocs_admin_campaign_rule_form( $form, &$form_state, $campaign_id = NULL)
 
             // Build a list of operations
             $operations = array();
-            $t_arg = array( '@campaign' => $rule['campaign_id'], '@event' => $rule['event_id']);
+            $t_arg = array( '@campaign' => $rule->campaign_id(), '@event' => $rule->event_id());
             $q_arg = array( 'query' => array( 'event_name' => $node->title));
 
             $operations['add'] = array( 
@@ -80,10 +88,11 @@ function ocs_admin_campaign_rule_form( $form, &$form_state, $campaign_id = NULL)
         // add rules
 		// Build a list of operations for rules
 		$operations = array();
-		$t_arg = array( '@campaign' => $rule['campaign_id'], '@rule' => $rule_id, '@event' => $rule['event_id']);
+		$t_arg = array( '@campaign' => $rule->campaign_id(), '@rule' => $rule_id, 
+            '@event' => $rule->event_id());
         $q_arg = array( 'query' => array( 
             'event_name' => $form['#event'][$event_id]['#event_name'],
-            'rule_name' => $rule['rule_name']));
+            'rule_name' => $rule->rule_name()));
 
         $operations['add'] = array( 
             '#type' => 'link',
@@ -108,8 +117,7 @@ function ocs_admin_campaign_rule_form( $form, &$form_state, $campaign_id = NULL)
 		$form['#event'][$event_id]['rule'][$rule_id] = array(
             'info' => $rule,
             'operations' => $operations);
-        $form['#rule'][$rule_id]['cond'] = array();
-        $form['#rule'][$rule_id]['action'] = array();
+        $form['#rule'][$rule_id]['rule'] = $rule;
 
         $form['#rule'][$rule_id]['#empty_action_text'] = 
             t('There are no actions yet. <a href="@url">Add Actions</a>.',
@@ -122,7 +130,8 @@ function ocs_admin_campaign_rule_form( $form, &$form_state, $campaign_id = NULL)
 
         // add conditions
         $form['#rule'][$rule_id]['#no_cond'] = 0;
-        if ( isset( $conditions[$rule_id])) {
+        $conditions = $rule->conditions();
+        if ( ! empty( $conditions)) {
 
             // add operations for 'Conditions(OR)'
             $operations = array();
@@ -145,17 +154,17 @@ function ocs_admin_campaign_rule_form( $form, &$form_state, $campaign_id = NULL)
             );
 
             $form['#rule'][$rule_id]['cond_operations'] = $operations;
-            $form['#rule'][$rule_id]['#no_cond'] = count( $conditions[$rule_id]);
+            $form['#rule'][$rule_id]['#no_cond'] = count( $conditions);
 
-            foreach( $conditions[$rule_id] as $cond) {
+            foreach( $conditions as $cond) {
                 $info = array(
                     '#type' => 'item',
-                    '#title' => $cond['cond_name'],
+                    '#title' => $cond->cond_name,
                 );
 
-                $cond_id = $cond['cond_id'];
+                $cond_id = $cond->cond_id;
                 $t_arg['@cond'] = $cond_id;
-                $q_arg['query']['name'] = $cond['cond_name'];
+                $q_arg['query']['name'] = $cond->cond_name;
 
                 $operations = array();
                 // 'cond_idx' value must not be passed to 'Add AND' link
@@ -167,7 +176,7 @@ function ocs_admin_campaign_rule_form( $form, &$form_state, $campaign_id = NULL)
                 );
 
                 // 'cond_idx' value must not be passed to 'Add AND' link
-                $q_arg['query']['idx'] = $cond['cond_idx'];
+                $q_arg['query']['idx'] = $cond->cond_idx;
                 $operations['delete'] = array( 
                     '#type' => 'link',
                     '#title' => t('Delete'),
@@ -191,7 +200,8 @@ function ocs_admin_campaign_rule_form( $form, &$form_state, $campaign_id = NULL)
         }
 
         // add actions
-        if ( isset( $actions[$rule_id])) {
+        $actions = $rule->actions();
+        if ( !empty( $actions)) {
             unset( $q_arg['query']['name']);
             unset( $q_arg['query']['idx']);
 
@@ -213,14 +223,14 @@ function ocs_admin_campaign_rule_form( $form, &$form_state, $campaign_id = NULL)
 
             $form['#rule'][$rule_id]['action_operations'] = $operations;
 
-            foreach( $actions[$rule_id] as $action) {
+            foreach( $actions as $action) {
                 $info = array(
                     '#type' => 'item',
-                    '#title' => $action['action_name'],
+                    '#title' => $action->action_name,
                 );
 
-                $t_arg['@action'] = $action['action_id'];
-                $q_arg['query']['name'] = $action['action_name'];
+                $t_arg['@action'] = $action->action_id;
+                $q_arg['query']['name'] = $action->action_name;
 
                 $operations = array();
 
@@ -243,7 +253,7 @@ function ocs_admin_campaign_rule_form( $form, &$form_state, $campaign_id = NULL)
                     '#options' => $q_arg,
                   );
 
-                $action_id = $action['action_id'];
+                $action_id = $action->action_id;
                 $form['#rule'][$rule_id]['action'][$action_id]['info'] = $info;
                 $form['#rule'][$rule_id]['action'][$action_id]['operations'] = $operations;
             }
@@ -259,87 +269,6 @@ function ocs_admin_campaign_rule_form( $form, &$form_state, $campaign_id = NULL)
     return $form;
 }
 
-
-/**
- * Recursive helper function for ocs_group_form().
- *
- * @param $tree
- *   The menu_tree retrieved by menu_tree_data.
- */
-function _ocs_campaign_tree_form($tree) 
-{
-//	dpm( $tree, 'condition tree');
-
-  $form = &drupal_static(__FUNCTION__, array('#tree' => TRUE));
-  foreach ($tree as $data) {
-    $title = '';
-    $item = $data;
-    if ($item ) {
-      $mlid = 'mlid:' . $item['mlid'];
-      $form[$mlid]['#item'] = $item;
-      $form[$mlid]['#attributes'] = array( 'class' => array('menu-enabled'));
-      $form[$mlid]['title']['#markup'] = $item['title'];
-      $form[$mlid]['weight'] = array(
-        '#type' => 'weight',
-        '#delta' => 50,
-//        '#default_value' => $item['weight'],
-        '#default_value' => 50,
-        '#title_display' => 'invisible',
-        '#title' => t('Weight for @title', array('@title' => $item['title'])),
-      );
-       $form[$mlid]['mlid'] = array(
-        '#type' => 'hidden',
-        '#value' => $item['mlid'],
-      );
-      $form[$mlid]['plid'] = array(
-        '#type' => 'hidden',
-        '#default_value' => $item['plid'],
-      );
-      // Build a list of operations
-      $operations = array();
-
-	  if ( $item['title'] == 'OR' || $item['title'] == 'AND') {
-		  $operations['edit'] = array(
-			'#type' => 'markup',
-			'#markup' => '',
-		  );
-		  $operations['delete'] = array(
-			'#type' => 'link',
-			'#title' => t('delete'),
-			'#href' => t( 'ocs_admin/campaign/@campaign/rule/nojs/@cond/delete',
-				array( '@campaign' => $data['db']['campaign_id'],
-					'@cond' => $item['mlid'])),
-			'#options' => array( 'html' => TRUE, 
-				'attributes' => array( 'class' => array( 'use-ajax'))),
-		  );
-	  }
-	  else {
-		  $operations['edit'] = array( 
-			'#type' => 'link',
-			'#title' => t('edit'),
-			'#href' => t( 'ocs_admin/campaign/@campaign/cond/@cond/edit',
-				array( '@campaign' => $data['db']['campaign_id'],
-					'@cond' => $item['mlid'])),
-			'#options' => array( 'query' => array( 'name' => $item['title'])),
-			);
-		  $operations['delete'] = array( 
-			'#type' => 'link',
-			'#title' => t('delete'),
-			'#href' => t( 'ocs_admin/campaign/@campaign/cond/@cond/delete',
-				array( '@campaign' => $data['db']['campaign_id'],
-					'@cond' => $item['mlid'])),
-			'#options' => array( 'query' => array( 'name' => $item['title'])),
-			);
-	  }
-      $form[$mlid]['operations'] = $operations;  
-    }
-
-    if ( isset($data['below'])) {
-      _ocs_campaign_tree_form($data['below']);
-    }
-  }
-  return $form;
-}
 
 function ocs_admin_campaign_rule_form_validate( $form, &$form_state)
 {
@@ -474,7 +403,7 @@ function ocs_admin_campaign_rule_theme( $form)
 
               $row = array();
               $row[] = array( 'data' => t('Rule @id : @name', 
-                array( '@id' => $rule_id, '@name' => $rule['info']['rule_name'])),
+                array( '@id' => $rule_id, '@name' => $rule['info']->rule_name())),
                 'colspan' => '3', 'class' => array( 'bd-top'));
               $row = array_merge( $row, _operation_list( $rule['operations'], array( 'bd-top')));
               $rows[] = $row;
