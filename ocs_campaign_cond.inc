@@ -9,7 +9,7 @@ function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id, $r
 	$cond_idx = isset( $_GET['idx']) ? $_GET['idx'] : 
         (isset( $form_state['values']) ? $form_state['values']['cond_idx'] : time());
     $operator = isset( $form_state['values']) ? $form_state['values']['operator'] : NULL;
-    $direct_input = isset( $form_state['values']['direct_input']) ? $form_state['values']['direct_input'] : 0;
+    $counter_input = isset( $form_state['values']['counter_input']) ? $form_state['values']['counter_input'] : 0;
 
 	if ( $op == 'edit') {
 		// it's editing mode
@@ -19,8 +19,8 @@ function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id, $r
             $selected_param = $condition['rule_id'].':'.$condition['param_id'];
         if ( ! isset( $operator))
             $operator = $condition['operator'];
-        if ( ! isset( $form_state['values']['direct_input']))
-            $direct_input = $condition['direct_input'];
+        if ( ! isset( $form_state['values']['counter_input']))
+            $counter_input = $condition['counter_input'];
 	}
 
 
@@ -136,11 +136,10 @@ function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id, $r
         '#attributes' => array('class' => array( 'borderless'), 'style' => 'width:40%'),
     );
 
-    $form['container']['valueset']['direct_input'] = array(
+    $form['container']['valueset']['counter_input'] = array(
         '#type' => 'checkbox',
         '#title' => "Input counter value from calling party's account",
-//        '#default_value' => $direct_input,
-        '#default_value' => $direct_input,
+        '#default_value' => $counter_input,
         '#ajax' => array(
             'callback' => 'ocs_admin_ajax_value_type',
             'wrapper' => 'replace_value_div',
@@ -152,8 +151,8 @@ function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id, $r
         '#type' => 'hidden',
     );
 
-//    dpm( $direct_input, 'dir input');
-    if ( ! $direct_input || $operator == 'between' ) {
+//    dpm( $counter_input, 'dir input');
+    if ( ! $counter_input || $operator == 'between' ) {
         $form['container']['valueset']['value'] = $params->get_form( $selected_param, $operator);
 //        dpm( $form['container']['valueset']['value'], 'direct input');
 
@@ -211,137 +210,6 @@ function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id, $r
 	return $form;
 }
 
-/*
-function ocs_admin_get_param_form( $paramlist, $param, $operator = NULL)
-{
-    $type = _get_param_type( $paramlist, $param);
-    $title = isset( $paramlist[$param.':title']) ? $paramlist[$param.':title'] : 'Value';
-
-    if ($type == OCS_PARAM_TYPE_ENUM) {
-        $options = array_flip( $paramlist[$param.':enum']);
-        dpm( $options, 'enum');
-        $form = array(
-            '#type' => ($operator == 'in list') ? 'checkboxes' : 'radios',
-            '#title' => $title,
-            '#options' => $options,
-        );
-    }
-    else if ( $type == OCS_PARAM_TYPE_COUNTER) {
-        $options = ocs_admin_get_counter_id_list();
-        $form = array(
-            '#type' => 'select',
-            '#title' => $title,
-            '#options' => array_flip( $options),
-        );
-    }
-    else if ( $type == OCS_PARAM_TYPE_MESSAGE) {
-        $options = ocs_admin_get_message_list();
-        $form = array(
-            '#type' => 'select',
-            '#title' => $title,
-            '#options' => $options,
-        );
-    }
-    else {
-        $form = array(
-            '#type' => 'textfield',
-            '#title' => $title,
-            '#size' => 30,
-        );
-    }
-
-    return $form;
-}
-
-// build parameter list info dictionary
-function ocs_admin_get_param_list( $node, $rule_id)
-{
-    $paramlist = array();
-    $options = array();
-
-    foreach( $node->field_ocs_param_ref['und'] as $param) {
-        $para = node_load( $param['target_id']);
-//				dpm( $para, 'parameter');
-
-        // store select options
-        $key = $rule_id . ':' . $param['target_id'];
-        $value = $para->title;
-        $options[ $node->title][ $key] = $value;
-        // store parameter info
-        $paramlist[$para->nid] = $para->field_ocs_param_type['und'][0]['value'];
-        $paramlist[$key] = $value;
-        $paramlist[$key.':title'] = $para->title;
-        if ( ! isset( $selected_param)) {
-            $selected_param = $rule_id . ':' . $param['target_id'];
-        }
-
-        // add additional condition if the parameter is 'account key' type
-        if ( $para->field_ocs_param_type['und'][0]['value'] == OCS_PARAM_TYPE_ACCOUNT_KEY) {
-            $paramlist[$key.':account'] = $options[ $node->title][ $key.':account'] = t( 'counter of the @val party', array( '@val' => $value));
-            $paramlist[$para->nid.':account'] = OCS_PARAM_TYPE_ACCOUNT_KEY;
-            // reset the type of original parameter as string
-            $paramlist[$para->nid] = OCS_PARAM_TYPE_STRING;		
-        }
-        else if ( $para->field_ocs_param_type['und'][0]['value'] == OCS_PARAM_TYPE_ENUM) {
-            // add enum value list
-            $paramlist[$key.':enum'] = json_decode( $para->field_ocs_param_value['und'][0]['value'], TRUE);
-        }
-    }
-
-    return array( $paramlist, $options, $selected_param);
-}
-
-function _campaign_operator( $paramlist, $selected)
-{
-//	dpm( $paramlist, 'param');
-//	dpm( $selected, 'selected');
-
-    $type = _get_param_type( $paramlist, $selected);
-	$oplist = array(
-		OCS_PARAM_TYPE_STRING => array(
-			'=', 'starts', 
-			),
-		OCS_PARAM_TYPE_INTEGER => array(
-			'=', '>', '>=', '<', '<=', 'between',
-			),
-		OCS_PARAM_TYPE_ENUM => array(
-			'=', 'in list',
-			),
-		OCS_PARAM_TYPE_ACCOUNT_KEY => array(
-			'=', '>', '>=', '<', '<=', 'between',
-			),
-		OCS_PARAM_TYPE_DATE => array(
-			'=', '>', '>=', '<', '<=', 'between',
-            ),
-		OCS_PARAM_TYPE_TIME => array(
-			'=', '>', '>=', '<', '<=', 'between',
-            ),
-		OCS_PARAM_TYPE_PRODUCT_KEY => array(
-			'=', 
-            ),
-	);
-
-	return drupal_map_assoc( $oplist[$type]);
-}
-
-
-function _get_param_type( $paramlist, $selected)
-{
-	$list = explode( ':', $selected);       // event:param:account or action:param:account
-
-    if ( substr( $selected, -7) == 'account') {
-        return OCS_PARAM_TYPE_ACCOUNT_KEY;
-    }
-    else if ( substr( $selected, -4) == 'enum') {
-        return OCS_PARAM_TYPE_ENUM;
-    }
-    else if ( isset( $paramlist[$list[1]])) {
-        return $paramlist[$list[1]];
-	}
-
-    return OCS_PARAM_TYPE_STRING;
-}
-*/
 
 function ocs_admin_ajax_change_param( $form, $form_state)
 {
@@ -358,7 +226,7 @@ function ocs_admin_campaign_add_cond_form_validate( $form, &$form_state)
 {
     $values = $form_state['values'];
 //    dpm( $values, 'form state');
-    if ( $values['direct_input']) {
+    if ( ! $values['counter_input']) {
         // direct input
 
         $params = $form['#paramlist'];
@@ -439,7 +307,7 @@ function ocs_admin_campaign_add_cond_form_submit( $form, &$form_state)
 			'param_id' => $list[1] . (isset($list[2]) ? ':'.$list[2] : ''),
 			'param_name' => $params->get_param( $values['param']),
 			'operator' => $values['operator'],
-			'direct_input' => $values['direct_input'],
+			'counter_input' => $values['counter_input'],
 			'value' => $value1,
 			'value2' => $value2,
             'cond_rule' => t('!para !op !value !value2', array(
@@ -811,7 +679,7 @@ function ocs_admin_campaign_rule_delete( $rule_id)
 
 function ocs_admin_campaign_rule_delete_confirm( $form, &$form_state, $campaign_id, $rule_id)
 {
-    $name = 'Rule ID:'.$rule_id;
+    $name = isset( $_GET['rule_name']) ? $_GET['rule_name'] : 'Rule ID:'.$rule_id;
     $form['#campaign_id'] = $campaign_id;
     $form['#rule_id'] = $rule_id;
 
