@@ -1062,7 +1062,7 @@ function ocs_admin_table_campaign()
 function ocs_admin_group_account_view()
 {
     // ocs_counter
-    $data['ocs_group_account_key']['table']['name'] = 'ocsdata.ocs_group_account_key';
+    $data['ocs_group_account_key']['table']['name'] = 'ocsdata.ocs_group_account_key_view';
     $data['ocs_group_account_key']['table']['group'] = t('OCS Group');
     $data['ocs_group_account_key']['table']['base'] = array(
         'field' => 'customer_id',
@@ -1110,7 +1110,6 @@ function ocs_admin_group_extra()
         'database' => 'ocsdb',
         'weight' => -10,
     );
-
     $data['ocs_group_member']['table']['join'] = array(
         'group' => array(
             'left_field' => 'group_id',

@@ -6,13 +6,14 @@ class OcsGroupRules
 {
     private $rules;
 
-    function load( $group_id) 
+    function load( $group_id = NULL) 
     {
         db_set_active('ocsdb');
 
         // load all rules data
         $query = db_select( 'ocs_rules', 'c');
-        $result = $query->condition( 'c.rule_key', t('group:!id:%', array( '!id' => $group_id)), 'like')
+        $rule_key = isset( $group_id) ? 'group:' . $group_id . ':%' : 'group:%';
+        $result = $query->condition( 'c.rule_key', $rule_key, 'like')
             ->fields( 'c')
             ->execute();
 

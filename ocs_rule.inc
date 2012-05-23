@@ -393,18 +393,8 @@ class OcsRule {
     }
 
 
-    function get_rule_script()
+    function get_rule_script( $target_action)
     {
-        // get id of 'give_bonus' action
-        $items = entity_load( 'node', FALSE, array( 'type' => 'ocs_actions', 'title' => 'give_bonus'));
-        if ( empty( $items)) {
-            drupal_set_message( 'unable to find action: give_bonus', 'error');
-            return $output;
-        }
-
-        $action = array_shift( $items);
-        $action_give_bonus = $action->nid;
-
         $newline = '
 ';
         $cond_rules = '';
@@ -438,7 +428,7 @@ class OcsRule {
             foreach( $this->actions as $action) {
                 $param = ocs_admin_campaign_action_param_load( $action->action_id);
 
-                if ( $action->ocs_action_id == $action_give_bonus) {
+                if ( $action->ocs_action_id == $target_action) {
                     // build parameter string : bonus_amount=123,counter_id=0,
                     $param_str = '';
                     foreach( $param as $para) {
@@ -476,6 +466,12 @@ class OcsRule {
             'conditions' => array( 'factors' => $cond_factors, 'rules' => $cond_rules),
             'actions' => array( 'factors' => $action_factors, 'rules' => $action_rules),
         );
+     }
+
+     static function get_action( $title) 
+     {
+        $items = entity_load( 'node', FALSE, array( 'type' => 'ocs_actions', 'title' => $title));
+        return array_shift( $items);
      }
 }
 

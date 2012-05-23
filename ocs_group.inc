@@ -57,7 +57,6 @@ function theme_ocs_admin_group_overview( $variables)
 function ocs_admin_group_edit_form( $form, &$form_state, $type, $groupid = NULL)
 {
     if ( isset( $groupid)) $group = group_load( $groupid);
-    dpm($_GET['account_key'], 'a');
     $form = array();
    
     $form['group'] = array(
@@ -108,13 +107,14 @@ function ocs_admin_group_edit_form( $form, &$form_state, $type, $groupid = NULL)
         '#prefix' => '<div class="container-inline form-item">',
         '#suffix' => '</div>'
     );
-
+    
     $form['group']['container']['master_number'] = array(
         '#type' => 'textfield',
         '#maxlength' => 24,
         '#size' => 30,
     );
     
+    // $_GET['account_key']
     $form['group']['container']['account_search'] = array(
         '#type' => 'submit',
         '#value' => 'Search Account',
@@ -127,7 +127,6 @@ function ocs_admin_group_edit_form( $form, &$form_state, $type, $groupid = NULL)
         '#collapsed' => FALSE,
     );
 
-    dpm( $group, 'group');
     $rules = new OcsGroupRules;
     $rules->load( $groupid);
 
@@ -184,7 +183,13 @@ function ocs_admin_group_edit_form( $form, &$form_state, $type, $groupid = NULL)
         $_SESSION['group_name'] = $group['group_name'];
         $_SESSION['limt_usage'] = $group['limit_usage'];
     }
-   
+    
+    if (isset($_GET['account_key'])) {
+        if (!$_GET['account_key'] == NULL) {
+            $form['group']['container']['master_number']['#default_value'] = $_GET['account_key'];
+        }
+    }
+    
     return $form;
 }
 
@@ -203,10 +208,10 @@ function ocs_admin_group_edit_form_validate($form, &$form_state)
             }
         }
         
-        $usage = ocs_admin_limit_usage($form_state);
-        if ($usage > 0) {
-            form_set_error( 'limit usage', 'Please check the members total limit usage');
-        }
+//        $usage = ocs_admin_limit_usage($form_state);
+//        if ($usage > 0) {
+//            form_set_error( 'limit usage', 'Please check the members total limit usage');
+//        }
     }
 }
 
@@ -214,6 +219,7 @@ function ocs_admin_group_edit_form_submit( $form, &$form_state)
 {
     $group = $form_state['values'];
     if ( $form_state['values']['op'] == 'Search Account') {
+         $_GET['account_key'] == NULL;
          $query = array(
             'redirect' => current_path(),
             'ancestor_group_id' => $form_state['values']['ancestor_group_id'],
@@ -738,6 +744,7 @@ function ocs_admin_tree_table_theme( $form, $header)
 function ocs_admin_group_delete_confirm( $form, &$form_state, $group)
 {
     $form['#group'] = $group;
+    $group = group_load( $group);
 
     if ( $group['parent_group_id'] == 0) {
         // delete the whole group
@@ -785,7 +792,7 @@ function ocs_admin_group_members_count( $group_id, $key)
 function ocs_admin_group_delete_confirm_submit( $form, &$form_state)
 {
     $group = $form['#group'];
-
+    $group = group_load( $group);
     if ( $group['parent_group_id'] == 0)
         ocs_admin_group_delete( $group);
     else
@@ -1043,23 +1050,18 @@ function ocs_admin_member_delete_confirm_submit( $form, &$form_state)
 function ocs_admin_group_save( $group)
 {
     db_set_active( 'ocsdb');
-    $from_time = str_pad($group['from_hour'], 2, '0', STR_PAD_LEFT) . 
-                 str_pad($group['from_min'], 2, '0', STR_PAD_LEFT);
-    $to_time = str_pad($group['to_hour'], 2, '0', STR_PAD_LEFT) . 
-               str_pad($group['to_min'], 2, '0', STR_PAD_LEFT);
+
     $fields = array( 
         'group_id' => isset($group['group_id']) ? $group['group_id'] : NULL,
-        'ancestor_group_id' => isset($group['ancestor_group_id']) ? $group['ancestor_group_id'] : 0,
+        'group_type' => isset($group['group_type']) ? $group['group_type'] : 0,
         'parent_group_id' => isset($group['parent_group_id']) ? $group['parent_group_id'] : 0,
+        'member_count' => isset($group['member_count']) ? $group['member_count'] : 0,
+        'ancestor_group_id' => isset($group['ancestor_group_id']) ? $group['ancestor_group_id'] : 0,
         'group_name' => isset($group['group_name']) ? $group['group_name'] : NULL,
         'service_type' => isset($group['service_type']) ? $group['service_type'] : 0,
-        'group_type' => isset($group['group_type']) ? $group['group_type'] : 0,
-        'member_count' => isset($group['member_count']) ? $group['member_count'] : 0,
         'limit_usage' => isset($group['limit_usage']) ? $group['limit_usage'] : 0,
-        'from_time' => $from_time,
-        'to_time' => $to_time,
-        'discount_rate' => isset($group['discount_rate']) ? $group['discount_rate'] : 0,
         );
+
     if ( isset( $group['master_number']))
         $fields['master_number'] = $group['master_number'];
 
@@ -1085,6 +1087,7 @@ function ocs_admin_group_save( $group)
                 ->execute();
         }
     }
+    
     db_set_active( 'default');
 }
 
@@ -1097,12 +1100,14 @@ function ocs_admin_group_delete( $group)
         ->condition( 'ancestor_group_id', $group['group_id'])
         ->execute();
     dpm( $status, 'db_delete result');
+
+    db_set_active('default');
 }
 
 function ocs_admin_subgroup_delete( $group)
 {
     db_set_active( 'ocsdb');
-
+dpm($group, 'groupdelete');
     // delete
     $status = db_delete( 'ocs_group')
         ->condition( 'group_id', $group['group_id'])
@@ -1118,6 +1123,8 @@ function ocs_admin_subgroup_delete( $group)
         ->condition( 'parent_group_id', $group['group_id'], '=')
         ->execute();
     dpm( $status, 'db_update result');
+
+    db_set_active('default');
 }
 
 /*
@@ -1813,6 +1820,7 @@ function ocs_admin_subgroup_add_page_wizard( $form, &$form_state, $group_id, $ar
         '#description' => t('Enter group limit usage'),
         '#maxlength' => 24,
         '#size' => 30,
+        '#default_value' => 0,
     );
  
     $form['section']['subgroup']['account_search'] = array(
@@ -1862,6 +1870,7 @@ function ocs_admin_subgroup_add_page_wizard_submit( $form, &$form_state)
         $_SESSION['form_mode'] = 'M';
 
         $query = array(
+            'redirect' => current_path(),
             'ancestor_group_id' => $ancestor_group_id,
             'account_key' => $form_state['values']['master_number'],
         );

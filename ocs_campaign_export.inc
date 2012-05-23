@@ -131,7 +131,6 @@ function ocs_admin_campaign_export_submit( $form, &$form_state)
 function _campaign_export()
 {
     $campaigns = ocs_admin_campaigns_load_all();
-    dpm( $campaigns, 'campaigns');
     
     $event_action = '[RULESET_EVENT_ACTIONS]
 service_id , string(30)
@@ -166,20 +165,24 @@ db_action , string(128)
     $bonus_factors = array();
     $amount_factors = array();
 
+    // get id of 'give_bonus' action
+    $action = OcsRule::get_action('give_bonus');
+    if ( empty( $action)) {
+        drupal_set_message( 'unable to find action: give_bonus', 'error');
+        return ;
+    }
+    $action_give_bonus = $action->nid;
+
     foreach( $campaigns as $campaign) {
         $campaign_id = $campaign['campaign_id'];
         $campaign_rules = new OcsCampaignRules;
         $campaign_rules->load( $campaign_id);
-
-        dpm( $campaign_rules->rules(), 'rules');
 
         // build event_actions.rule file
         $events = array();
         foreach( $campaign_rules->rules() as $rule) {
             $event_id = $rule->event_id();
             $event_node = node_load( $event_id);
-
-            dpm( $event_node, 'event node');
 
             if ( ! in_array( $event_id, $events) ) {
                 $events[] = $event_id;
@@ -200,8 +203,7 @@ db_action , string(128)
             }
 
             // build activation_bonus.rule file
-            $script = $rule->get_rule_script();
-            dpm( $script, 'rule script');
+            $script = $rule->get_rule_script( $action_give_bonus);
 
             $bonus_cond .= $script['conditions']['rules'];
             $bonus_factors = array_merge( $bonus_factors, $script['conditions']['factors']);
@@ -225,23 +227,6 @@ db_action , string(128)
 
     return array( $event_action, $bonus_cond. $bonus_amount);
 }
-
-/*
-function _get_rule_property( $param_id, $factor)
-{
-    // return 'int' for account counters
-    if ( substr( $param_id, -7) == 'account') {
-        return 'int ';
-    }
-
-    $items = entity_load( 'node', FALSE, array( 'type' => 'ocs_param', 'title' => $factor));
-    $item = array_shift( $items);
-    if ( ! empty($item)) {
-        return $item->field_rule_property['und'][0]['value'];
-    }
-    return '';
-}
-*/
 
 
 // get all active campaigns

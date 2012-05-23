@@ -1,5 +1,7 @@
 <?php
 
+require_once( 'ocs_rule_group.inc');
+
 /*
     state transition rule form
 */
@@ -111,33 +113,30 @@ function ocs_admin_export_state_transition_submit( $form, &$form_state)
 {
     $values = $form_state['values'];
 
-    if ( $values['op'] == 'Update Configuration') {
-        _update_configuration( $values);
+    if ( $values['op'] != 'Cancel') {
+        _update_configuration( $values['file_name'], $values['file_content']);
     }
 
     $form_state['redirect'] = 'ocs_admin/config/ocs/state/transition';
 }
 
-function _update_configuration( $values)
+function _update_configuration( $file_name, $content)
 {
-    $json = $values['file_content'];
-    dpm( $json, 'json');
-
     // write to file
     try{
-        $fd = fopen( '/tmp/'. $values['file_name'], 'w');
-        fwrite( $fd, $json);
+        $fd = fopen( '/tmp/'. $file_name, 'w');
+        fwrite( $fd, $content);
         fclose( $fd);
 
         $ip_address = variable_get('ocs_admin_ip_address', 'Administrative Warning');
         $user = variable_get('ocs_admin_user_account', 'Administrative Warning');
         $passwd = variable_get('ocs_admin_user_password', 'Administrative Warning');
         $dir = variable_get('ocs_admin_config_directory', 'Administrative Warning');
-        $file_name = $values['file_name'];
 
         // ftp to host
         if ( ocs_admin_ftp_put( $ip_address, $user, $passwd, $dir, $file_name)) {
-            drupal_set_message( t('State Configuration file is updated in the OCS'));
+            drupal_set_message( t('Configuration file "@name" is uploaded to the OCS',
+                array( '@name' => $file_name)));
         }
     }
     catch( Exception $e) {
@@ -263,8 +262,8 @@ function ocs_admin_export_state_svc_perm_submit( $form, &$form_state)
 {
     $values = $form_state['values'];
 
-    if ( $values['op'] == 'Update Configuration') {
-        _update_configuration( $values);
+    if ( $values['op'] != 'Cancel') {
+        _update_configuration( $values['file_name'], $values['file_content']);
     }
 
     $form_state['redirect'] = 'ocs_admin/config/ocs/svcperm';
@@ -390,8 +389,8 @@ function ocs_admin_export_message_submit( $form, &$form_state)
 {
     $values = $form_state['values'];
 
-    if ( $values['op'] == 'Update Configuration') {
-        _update_configuration( $values);
+    if ( $values['op'] != 'Cancel') {
+        _update_configuration( $values['file_name'], $values['file_content']);
     }
 
     $form_state['redirect'] = 'ocs_admin/config/ocs/message';
@@ -448,10 +447,20 @@ function ocs_admin_export_vpntariff( $form, &$form_state)
         '#markup' => $action_file_name,
     );
 
+    $form['pps_action_file_name'] = array(
+        '#type' => 'hidden',
+        '#value' => $action_file_name,
+    );
+
     $form['ocs']['discount_rule_file'] = array(
         '#type' => 'item',
         '#title' => 'VPN Discount Rule File Name',
         '#markup' => $discount_file_name,
+    );
+
+    $form['discount_rule_file_name'] = array(
+        '#type' => 'hidden',
+        '#value' => $discount_file_name,
     );
 
     list( $action, $discount) = _vpn_discount_export();
@@ -489,8 +498,9 @@ function ocs_admin_export_vpntariff_submit( $form, &$form_state)
 {
     $values = $form_state['values'];
 
-    if ( $values['op'] == 'Update Configuration') {
-        _update_configuration( $values);
+    if ( $values['op'] != 'Cancel') {
+        _update_configuration( $values['pps_action_file_name'], $values['action_rule']);
+        _update_configuration( $values['discount_rule_file_name'], $values['discount_rule']);
     }
 
     $form_state['redirect'] = 'ocs_admin/config/ocs/vpntariff';
@@ -499,98 +509,95 @@ function ocs_admin_export_vpntariff_submit( $form, &$form_state)
 
 function _vpn_discount_export()
 {
-    $campaigns = ocs_admin_campaigns_load_all();
-    dpm( $campaigns, 'campaigns');
+    $vpn_rules = new OcsGroupRules;
+    $vpn_rules->load();     // load all group rules
     
-    $event_action = '[RULESET_EVENT_ACTIONS]
+    $pps_action = '
+[RULESET_PPS_ACTIONS]
 service_id , string(30)
-event_name , string(32)
+event_name, string(32)
 promotion_service_id , string(30) , result, mandatory
 priority , int , result, mandatory
 promotion_category , string(30), result
 promotion_parameter, string(256) , result, mandatory
-
-[EVENT_ACTIONS]';
+ 
+[PPS_ACTIONS]
+';
 
     $newline = '
 ';
 
-    $bonus_cond = '
-
-[RULESET_ACTIVATION_BONUS_CONDITION]
+    $discount_cond = '
+[RULESET_VPN_DISCOUNT]
 !rules
-
-[ACTIVATION_BONUS_CONDITION]
+  
+[VPN_DISCOUNT]
 ';
 
-    $bonus_amount = '
-[RULESET_ACTIVATION_BONUS_AMOUNT]
-targetRule , string(32)
-db_action , string(128)
+    $discount_rate = '
+[RULESET_VPN_DISCOUNT_RATE]
 !rules
- 
-[ACTIVATION_BONUS_AMOUNT]
+
+[VPN_DISCOUNT_RATE]
 ';
+    $cond_factors = array();
+    $rate_factors = array();
 
-    $bonus_factors = array();
-    $amount_factors = array();
+    // get id of 'apply_discount' action
+    $action = OcsRule::get_action('apply_discount');
+    if ( empty( $action)) {
+        drupal_set_message( 'Unable to find action: apply_discount', 'error');
+        return;
+    }
+    $action_apply_discount = $action->nid;
 
-    foreach( $campaigns as $campaign) {
-        $campaign_id = $campaign['campaign_id'];
-        $campaign_rules = new OcsCampaignRules;
-        $campaign_rules->load( $campaign_id);
+    $events = array();
+    $idx = 1;
+    foreach( $vpn_rules->rules() as $rule) {
+        $event_id = $rule->event_id();
+        if ( empty( $event_id)) continue;
 
-        dpm( $campaign_rules->rules(), 'rules');
+        $event_node = node_load( $event_id);
 
-        // build event_actions.rule file
-        $events = array();
-        foreach( $campaign_rules->rules() as $rule) {
-            $event_id = $rule->event_id();
-            $event_node = node_load( $event_id);
+        if ( ! in_array( $event_id, $events) ) {
+            $events[] = $event_id;
 
-            dpm( $event_node, 'event node');
-
-            if ( ! in_array( $event_id, $events) ) {
-                $events[] = $event_id;
-
-                $property = json_decode($event_node->field_property['und'][0]['value'], TRUE);
-                if ( !empty( $property)) {
-                    $property_str = '';
-                    foreach( $property as $key => $value) {
-                        $property_str .= $key . '=' . $value . ' ';
-                    }
+            $property = json_decode($event_node->field_property['und'][0]['value'], TRUE);
+            if ( !empty( $property)) {
+                $property_str = '';
+                foreach( $property as $key => $value) {
+                    $property_str .= $key . '=' . $value . ' ';
                 }
-
-                $event_action .= t("
-    @id: @property event_name=@event, promotion_service_id = giving_bonus , priority = 10 , promotion_parameter = 't_bonus_condition=activation_bonus_condition&t_bonus_amount=activation_bonus_amount'", 
-                    array( '@id' => $campaign_id, '@event' => $event_node->title,
-                        '@property' => isset( $property) ? $property_str.',' : ''));
-
             }
 
-            // build activation_bonus.rule file
-            $script = $rule->get_rule_script();
-            dpm( $script, 'rule script');
+            $pps_action .= t("
+@id: @property event_name=@event, promotion_service_id = giving_bonus , priority = 10 , promotion_parameter = 't_bonus_condition=activation_bonus_condition&t_bonus_amount=activation_bonus_amount'", 
+                array( '@id' => $idx++, '@event' => $event_node->title,
+                    '@property' => isset( $property) ? $property_str.',' : ''));
 
-            $bonus_cond .= $script['conditions']['rules'];
-            $bonus_factors = array_merge( $bonus_factors, $script['conditions']['factors']);
-
-            $bonus_amount .= $script['actions']['rules'];
-            $amount_factors = array_merge( $amount_factors, $script['actions']['factors']);
         }
+
+        // build activation_bonus.rule file
+        $script = $rule->get_rule_script( $action_apply_discount);
+
+        $discount_cond .= $script['conditions']['rules'];
+        $cond_factors = array_merge( $cond_factors, $script['conditions']['factors']);
+
+        $discount_rate .= $script['actions']['rules'];
+        $rate_factors = array_merge( $rate_factors, $script['actions']['factors']);
     }
 
     $rule_str = '';
-    foreach( $bonus_factors as $key => $property) {
+    foreach( $cond_factors as $key => $property) {
         $rule_str .= $key . ', ' . $property . $newline;
     }
-    $bonus_cond = t( $bonus_cond, array('!rules' => $rule_str));
+    $discount_cond = t( $discount_cond, array('!rules' => $rule_str));
 
     $rule_str = '';
-    foreach( $amount_factors as $key => $property) {
+    foreach( $rate_factors as $key => $property) {
         $rule_str .= $key . ', ' . $property . $newline;
     }
-    $bonus_amount = t( $bonus_amount, array('!rules' => $rule_str));
+    $discount_rate = t( $discount_rate, array('!rules' => $rule_str));
 
-    return array( $event_action, $bonus_cond. $bonus_amount);
+    return array( $pps_action, $discount_cond. $discount_rate);
 }
