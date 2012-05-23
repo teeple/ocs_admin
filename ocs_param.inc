@@ -1,6 +1,6 @@
 <?php
 
-module_load_include( 'inc', 'ocs_admin', 'ocs_common');
+require_once( 'ocs_common.inc');
 
 // manages Parameters that belongs to each Event
 // 
@@ -116,7 +116,7 @@ class OcsParam
 
         if ($type == OCS_PARAM_TYPE_ENUM) {
             $options = array_flip( $this->params[$param.':enum']);
-            dpm( $options, 'enum');
+            //dpm( $options, 'enum');
             $form = array(
                 '#type' => ($operator == 'in list') ? 'checkboxes' : 'radios',
                 '#title' => $title,

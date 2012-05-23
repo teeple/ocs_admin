@@ -59,7 +59,6 @@ class OcsRule {
             ->execute()
             ->fetch();
 
-        dpm( $result, 'rule');
         $this->rule = $result;
         $this->load_conditions();
         $this->load_actions();
@@ -147,7 +146,7 @@ class OcsRule {
         $operations['add'] = array( 
             '#type' => 'link',
             '#title' => t('Add AND'),
-            '#href' => t( 'ocs_admin/campaign/@campaign/rule/@rule/cond/@cond/add', $t_arg),
+            '#href' => t( 'ocs_admin/rule/@rule/cond/@cond/add', $t_arg),
             '#options' => $q_arg,
         );
 
@@ -156,14 +155,14 @@ class OcsRule {
         $operations['delete'] = array( 
             '#type' => 'link',
             '#title' => t('Delete'),
-            '#href' => t( 'ocs_admin/campaign/@campaign/rule/@rule/cond/@cond/delete', $t_arg),
+            '#href' => t( 'ocs_admin/rule/@rule/cond/@cond/delete', $t_arg),
             '#options' => $q_arg,
         );
 
         $operations['edit'] = array( 
             '#type' => 'link',
             '#title' => t('Edit'),
-            '#href' => t( 'ocs_admin/campaign/@campaign/rule/@rule/cond/@cond/edit', $t_arg),
+            '#href' => t( 'ocs_admin/rule/@rule/cond/@cond/edit', $t_arg),
             '#options' => $q_arg,
         );
 
@@ -187,14 +186,14 @@ class OcsRule {
                 $operations['add'] = array( 
                     '#type' => 'link',
                     '#title' => t('Add OR'),
-                    '#href' => t( 'ocs_admin/campaign/@campaign/rule/@rule/cond/0/add', $t_arg),
+                    '#href' => t( 'ocs_admin/rule/@rule/cond/0/add', $t_arg),
                     '#options' => $q_arg,
                 );
 
                 $operations['delete'] = array( 
                     '#type' => 'link',
                     '#title' => t('Delete OR'),
-                    '#href' => t( 'ocs_admin/campaign/@campaign/rule/@rule/cond/0/delete', $t_arg),
+                    '#href' => t( 'ocs_admin/rule/@rule/cond/0/delete', $t_arg),
                     '#options' => $q_arg,
                 );
 
@@ -238,7 +237,7 @@ class OcsRule {
                 $white_cell,
                 array('data' => 'Conditions'),
                 t('There are no conditions yet. <a href="@url">Add Conditions</a>.',
-                    array( '@url' => url( t( 'ocs_admin/campaign/@campaign/rule/@rule/cond/0/add', $t_arg), 
+                    array( '@url' => url( t( 'ocs_admin/rule/@rule/cond/0/add', $t_arg), 
                         $q_arg))),
             );
         }
@@ -261,14 +260,14 @@ class OcsRule {
         $operations['delete'] = array( 
             '#type' => 'link',
             '#title' => t('Delete'),
-            '#href' => t( 'ocs_admin/campaign/@campaign/rule/@rule/action/@action/delete', $t_arg),
+            '#href' => t( 'ocs_admin/rule/@rule/action/@action/delete', $t_arg),
             '#options' => $q_arg,
           );
 
         $operations['edit'] = array( 
             '#type' => 'link',
             '#title' => t('Edit'),
-            '#href' => t( 'ocs_admin/campaign/@campaign/rule/@rule/action/@action/edit', $t_arg),
+            '#href' => t( 'ocs_admin/rule/@rule/action/@action/edit', $t_arg),
             '#options' => $q_arg,
           );
 
@@ -293,14 +292,14 @@ class OcsRule {
                 $operations['add'] = array( 
                     '#type' => 'link',
                     '#title' => t('Add'),
-                    '#href' => t( 'ocs_admin/campaign/@campaign/rule/@rule/action/add', $t_arg),
+                    '#href' => t( 'ocs_admin/rule/@rule/action/add', $t_arg),
                     '#options' => $q_arg,
                 );
 
                 $operations['delete'] = array( 
                     '#type' => 'link',
                     '#title' => t('Delete All'),
-                    '#href' => t( 'ocs_admin/campaign/@campaign/rule/@rule/action/0/delete', $t_arg),
+                    '#href' => t( 'ocs_admin/rule/@rule/action/0/delete', $t_arg),
                     '#options' => $q_arg,
                 );
                 $row = array(
@@ -313,9 +312,12 @@ class OcsRule {
             $row = array();
             $row[] = $white_cell;
             $row[] = $white_cell;
+
+            $title = substr( $action->action_name, 0, 70);
+            if ( strlen( $action->action_name) > 70) $title .= ' ...';
             $row[] = array( 'data' => array(
                     '#type' => 'item',
-                    '#title' => $action->action_name,
+                    '#title' => $title,
                 ));
 
             $operations = $this->get_action_operations( $action, $t_arg, $q_arg);
@@ -331,7 +333,7 @@ class OcsRule {
             $row[] = array('data' => 'Actions', 'class' => array('bd-top', 'dotted'));
             $row[] = array('data' => 
                 t('There are no actions yet. <a href="@url">Add Actions</a>.',
-                    array( '@url' => url( t( 'ocs_admin/campaign/@campaign/rule/@rule/action/add', $t_arg), $q_arg))),
+                    array( '@url' => url( t( 'ocs_admin/rule/@rule/action/add', $t_arg), $q_arg))),
 
                     'class' => array( 'bd-top', 'dotted'));
             $row[] = array( 'data' => '', 'colspan' => '3');
@@ -378,7 +380,8 @@ class OcsRule {
         $operations = $this->get_operations( $arg);
         $rows[] = array_merge( $row, $this->render_operations( $operations, array( 'bd-top')));
 
-        if ( isset( $arg)) $arg['query']['rule_name'] = $this->rule->rule_name;
+        $arg['query']['rule_name'] = $this->rule->rule_name;
+        $arg['query']['redirect'] = current_path();
 
         // add conditions
         $rows = array_merge( $rows, $this->render_conditions( $arg));
@@ -388,78 +391,125 @@ class OcsRule {
 
         return $rows;
     }
+
+
+    function get_rule_script()
+    {
+        // get id of 'give_bonus' action
+        $items = entity_load( 'node', FALSE, array( 'type' => 'ocs_actions', 'title' => 'give_bonus'));
+        if ( empty( $items)) {
+            drupal_set_message( 'unable to find action: give_bonus', 'error');
+            return $output;
+        }
+
+        $action = array_shift( $items);
+        $action_give_bonus = $action->nid;
+
+        $newline = '
+';
+        $cond_rules = '';
+        $cond_factors = array();
+        $action_rules = '';
+        $action_factors = array();
+
+
+        $rule_name = str_replace( ' ', '_', $this->rule->rule_name);
+        if ( ! empty( $this->conditions)) {
+            foreach( $this->conditions as $conds) {
+                $cond_rules .= $newline . $rule_name . ' : ';
+
+                $i =0;
+                foreach( $conds as $cond) {
+                    if ( $i ++ > 0) $cond_rules .= ',';
+                    $cond_rules .= $cond->cond_rule;
+
+                    list( $factor, $op, $value) = explode( ' ', $cond->cond_rule);
+
+                    if ( ! isset( $cond_factors[$factor])) {
+                        $cond_factors[ $factor] = _get_rule_property( $cond->param_id, $factor);
+                    }
+                }
+            }
+        }
+
+        if ( ! empty( $this->actions)) {
+
+            $i =0;
+            foreach( $this->actions as $action) {
+                $param = ocs_admin_campaign_action_param_load( $action->action_id);
+
+                if ( $action->ocs_action_id == $action_give_bonus) {
+                    // build parameter string : bonus_amount=123,counter_id=0,
+                    $param_str = '';
+                    foreach( $param as $para) {
+                        $factor = $para['param_name'];
+                        $param_str .= t('@n=@v,',
+                            array( '@n' => $factor, '@v' => _get_action_param_value( $para)));
+
+                        if ( ! isset( $action_factors[$factor])) {
+                            $action_factors[$factor] = _get_rule_property( $cond->param_id, $factor);
+                        }
+                    }
+
+                    $action_rules .= $newline . t('@name : targetRule = @name, ',
+                        array( '@name' => $rule_name)) . $param_str;
+                }
+                else {
+                    // build parameter string in this format : send_noti&msgid=123&counter_id=0,
+                    $param_str = '';
+                    foreach( $param as $para) {
+                        $param_str .= t('&@n=@v',
+                            array( '@n' => $factor, 
+                                '@v' => _get_action_param_value( $para)));
+                    }
+
+                    $node = node_load( $action->ocs_action_id);
+                    $action_rules .= $newline . t("@name : targetRule = @name, db_action='@action!param'",
+                        array( '@name' => $rule_name, '@action' => $node->title,
+                            '!param' => $param_str));
+                }
+
+            }
+        }
+
+        return array(
+            'conditions' => array( 'factors' => $cond_factors, 'rules' => $cond_rules),
+            'actions' => array( 'factors' => $action_factors, 'rules' => $action_rules),
+        );
+     }
 }
 
-class OcsCampaignRules
+
+
+function _get_rule_property( $param_id, $factor)
 {
-    private $rules;
-
-    function OcsCampaign() {
+    // return 'int' for account counters
+    if ( substr( $param_id, -7) == 'account') {
+        return 'int ';
     }
 
-    function load( $campaign_id) 
-    {
-        db_set_active('ocsdb');
-
-        // load all rules data
-        $query = db_select( 'ocs_rules', 'c');
-        $result = $query->condition( 'c.rule_key', t('campaign:!id%', array( '!id' => $campaign_id)), 'like')
-            ->fields( 'c')
-            ->execute();
-
-        $this->rules = array();
-        while( $record = $result->fetch())
-        {
-            $this->rules[ $record->rule_id] = new OcsRule( $record);
-        }
-
-        db_set_active( 'default');
+    $items = entity_load( 'node', FALSE, array( 'type' => 'ocs_param', 'title' => $factor));
+    $item = array_shift( $items);
+    if ( ! empty($item)) {
+        return $item->field_rule_property['und'][0]['value'];
     }
-
-    function rules()
-    {
-        return $this->rules;
-    }
+    return '';
 }
 
-class OcsGroupRules
+function _get_action_param_value( $param)
 {
-    private $rules;
+    $counter_id = ocs_admin_get_counter_id_list();
 
-    function load( $group_id) 
-    {
-        db_set_active('ocsdb');
-
-        // load all rules data
-        $query = db_select( 'ocs_rules', 'c');
-        $result = $query->condition( 'c.rule_key', t('group:!id', array( '!id' => $group_id)), '=')
-            ->fields( 'c')
-            ->execute();
-
-        $this->rules = array();
-        while( $record = $result->fetch())
-        {
-            $this->rules[ $record->rule_id] = new OcsRule( $record);
+    if ( $param['param_name'] == 'counter') {
+        // return counter id
+        if ( ! isset( $counter_id[ $param['value']])) {
+            drupal_set_message( t('Unable to find counter "@name" in the counter name table.', array( '@name' => $param['value'])), 'warning');
         }
-
-        db_set_active( 'default');
-    }
-
-    function rules()
-    {
-        return $this->rules;
-    }
-
-    function render()
-    {
-        $rows = array();
-
-        foreach( $this->rules as $rule) {
-            $rows = array_merge( $rows, $rule->table_rows());
+        else {
+            return $counter_id[ $param['value']];
         }
-
-        dpm( $rows, 'rows');
-
-        return theme( 'table', array( 'header' => array(), 'rows' => $rows));
     }
+    return $param['value'];
 }
+
+

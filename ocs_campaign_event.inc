@@ -2,14 +2,11 @@
 
 function ocs_admin_campaign_event_form( $form, &$form_state, $campaign_id)
 {
+    $form['#campaign_id'] = $campaign_id;
+
     $form['body'] = array(
         '#type' => 'markup',
         '#markup' => t( 'Select the event to add.'),
-    );
-
-    $form['campaign_id'] = array(
-        '#type' => 'hidden',
-        '#value' => $campaign_id,
     );
 
     $items = entity_load('node', FALSE, array('type' => 'ocs_events'));
@@ -27,32 +24,15 @@ function ocs_admin_campaign_event_form( $form, &$form_state, $campaign_id)
 		'#description' => t('Whenever the event occurs, rule evaluation is trigged'),
 	);
 
-	/*
-  	$event_status = ocs_admin_campaign_events_load_all( $campaign_id);
-	dpm( $event_status, 'event');
-
-	foreach( $options as $client => $events) {
-		$form[$client] = array(
-			'#type' => 'fieldset',
-			'#title' => $client . ' Events',
-			'#collapsible' => TRUE,
-			'#collapsed' => FALSE,
-		);
-
-		$form[$client][$client.'event_id'] = array(
-			'#type' => 'checkboxes',
-			'#title' => t('React on event'),
-			'#options' => $events,
-			'#default_value' => array_keys( $event_status),
-			'#description' => t('Whenever the event occurs, rule evaluation is trigged'),
-		);
-	}
-	*/
-
     $form['actions'] = array('#type' => 'actions');
     $form['actions']['submit'] = array(
         '#type' => 'submit',
-        '#value' => t('Save configuration'),
+        '#value' => t('Save'),
+    );
+
+    $form['actions']['cancel'] = array(
+        '#type' => 'submit',
+        '#value' => t('Cancel'),
     );
 
     return $form;
@@ -60,37 +40,20 @@ function ocs_admin_campaign_event_form( $form, &$form_state, $campaign_id)
 
 function ocs_admin_campaign_event_form_submit( $form, &$form_state)
 {
-    dpm( $form_state['values'], 'form_state');
-    $event = $form_state['values'];
+    $values = $form_state['values'];
+    if ( $values['op'] != 'Cancel') {
+        $event = array(
+            'rule_id' => NULL,
+            'rule_key' => t( 'campaign:@c:event:@e', 
+                array( '@c' => $form['#campaign_id'], '@e' => $values['event_id'])),
+        );
 
-    ocs_admin_campaign_event_save( $event);
-
-    $form_state['redirect'] = 'ocs_admin/campaign/' . $event['campaign_id'] .'/rule';
-}
-
-/*
-    get condition list
-*/
-function ocs_admin_campaign_events_load_all( $campaign_id, $key = 'rule_id')
-{
-    db_set_active('ocsdb');
-
-    // get group information
-    $query = db_select( 'ocs_campaign_rules', 'c');
-    $result = $query->condition( 'c.campaign_id', $campaign_id, '=')
-        ->fields( 'c')
-        ->execute();
-
-    $records = array();
-    while( $record = $result->fetchAssoc())
-    {
-        $records[ $record[$key]][] = $record;
+        ocs_admin_rule_save( $event);
     }
 
-    db_set_active( 'default');
-
-    return $records;
+    $form_state['redirect'] = 'ocs_admin/campaign/' . $form['#campaign_id'] . '/rule';
 }
+
 
 /*
 ** delete an event
@@ -133,34 +96,12 @@ function ocs_admin_campaign_delete_event( $campaign_id, $event_id)
     db_set_active( 'ocsdb');
 
 	// delete event from campaign
-	$result = db_delete( 'ocs_campaign_rules')
-		->condition( 'campaign_id', $campaign_id, '=')
-		->condition( 'event_id', $event_id, '=')
+	$result = db_delete( 'ocs_rules')
+		->condition( 'rule_key', 'campaign:'.$campaign_id.':event:'.$event_id, '=')
 		->execute();
 	dpm( $result, 'ocs_campaign_event result');
 
     db_set_active( 'default');
 }
 
-/*
-    save OCS campaign event
-*/
-function ocs_admin_campaign_event_save( $campaign)
-{
-    db_set_active( 'ocsdb');
-
-    $fields = array();
-	foreach( array( 'campaign_id', 'event_id') as $key) {
-		$fields[$key] = $campaign[$key];
-	}
-
-    $status = db_merge( 'ocs_campaign_rules')
-        ->key( array( 'event_id' => $campaign['event_id'], 'campaign_id' => $campaign['campaign_id']))
-        ->fields( $fields)
-        ->execute();
-    dpm( $status, 'db_merge result');
-
-    db_set_active( 'default');
-}
- 
 

@@ -1,9 +1,9 @@
 <?php
 
-module_load_include( 'inc', 'ocs_admin', 'ocs_rule');
-module_load_include( 'inc', 'ocs_admin', 'ocs_param');
+require_once( 'ocs_rule.inc');
+require_once( 'ocs_param.inc');
 
-function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id, $rule_id, $cond_id, $op = NULL)
+function ocs_admin_rule_add_cond_form( $form, &$form_state, $rule_id, $cond_id, $op = NULL)
 {
 	$selected_param = isset( $form_state['values']['param']) ? $form_state['values']['param'] : NULL;
 	$cond_idx = isset( $_GET['idx']) ? $_GET['idx'] : 
@@ -13,7 +13,7 @@ function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id, $r
 
 	if ( $op == 'edit') {
 		// it's editing mode
-		$condition = ocs_admin_campaign_cond_load( $cond_id, $cond_idx);
+		$condition = ocs_admin_rule_cond_load( $cond_id, $cond_idx);
 
 		if ( ! isset( $selected_param))
             $selected_param = $condition['rule_id'].':'.$condition['param_id'];
@@ -26,20 +26,19 @@ function ocs_admin_campaign_add_cond_form( $form, &$form_state, $campaign_id, $r
 
 	$form = array();
 
-	$form['#campaign_id'] = $campaign_id;
 	$form['#rule_id'] = $rule_id;
 	$form['#cond_id'] = $cond_id;
 	$form['#op'] = $op;
-
-	$form['event'] = array(
-		'#type' => 'item',
-		'#title' => t( 'Event : <em>@name</em>', array('@name' => strip_tags($_GET['event_name']))), 
-	);
 
 	$form['rule'] = array(
 		'#type' => 'item',
 		'#title' => t( 'Rule : <em>@name</em>', array('@name' => strip_tags($_GET['rule_name']))), 
 	);
+
+	$form['redirect'] = array(
+        '#type' => 'hidden',
+        '#value' => isset( $_GET['redirect']) ? $_GET['redirect'] : $form_state['values']['redirect'],
+    );
 
 	$rule = &drupal_static( __FUNCTION__ . 'rule', NULL);
     if ( empty( $rule)) {
@@ -222,28 +221,29 @@ function ocs_admin_ajax_value_type( $form, $form_state)
 }
 
 
-function ocs_admin_campaign_add_cond_form_validate( $form, &$form_state)
+function ocs_admin_rule_add_cond_form_validate( $form, &$form_state)
 {
     $values = $form_state['values'];
 //    dpm( $values, 'form state');
-    if ( ! $values['counter_input']) {
-        // direct input
+	if ( $values['op'] != 'Cancel') {
+        if ( ! $values['counter_input']) {
+            // direct input
 
-        $params = $form['#paramlist'];
-        $type = $params->type( $values['param']);
-        $msg = ocs_admin_check_param_value( $type, $values['value']);
-        if ( ! empty( $msg)) {
-            form_set_error( 'value', $msg);
-        }
-
-        if ( $form['container']['valueset']['value2']['#type'] != 'hidden') {
-            $msg = ocs_admin_check_param_value( $type, $values['value2']);
+            $params = $form['#paramlist'];
+            $type = $params->type( $values['param']);
+            $msg = ocs_admin_check_param_value( $type, $values['value']);
             if ( ! empty( $msg)) {
-                form_set_error( 'value2', $msg);
+                form_set_error( 'value', $msg);
+            }
+
+            if ( $form['container']['valueset']['value2']['#type'] != 'hidden') {
+                $msg = ocs_admin_check_param_value( $type, $values['value2']);
+                if ( ! empty( $msg)) {
+                    form_set_error( 'value2', $msg);
+                }
             }
         }
     }
-
 }
 
 function ocs_admin_check_param_value( $type, $value)
@@ -290,7 +290,7 @@ function ocs_admin_check_param_value( $type, $value)
     return NULL;
 }
 
-function ocs_admin_campaign_add_cond_form_submit( $form, &$form_state)
+function ocs_admin_rule_add_cond_form_submit( $form, &$form_state)
 {
 	$values = $form_state['values'];
 	dpm( $values, 'values submit');
@@ -324,12 +324,12 @@ function ocs_admin_campaign_add_cond_form_submit( $form, &$form_state)
 		);
         dpm( $cond, 'condition to submit');
         if ( $form['#op'] == 'edit')
-            ocs_admin_campaign_condition_save( $cond);
+            ocs_admin_rule_condition_save( $cond);
         else
-            ocs_admin_campaign_condition_add( $cond);
+            ocs_admin_rule_condition_add( $cond);
 	}
 
-	$form_state['redirect'] = 'ocs_admin/campaign/' . $form['#campaign_id'] . '/rule';
+	$form_state['redirect'] = $values['redirect'];
 }
 
 function _get_param_name( $params, $values)
@@ -374,7 +374,7 @@ function _get_param_value( $paramlist, $param, $value)
 /*
     save OCS campaign condition
 */
-function ocs_admin_campaign_condition_save( $cond)
+function ocs_admin_rule_condition_save( $cond)
 {
     db_set_active('ocsdb');
 
@@ -393,7 +393,7 @@ function ocs_admin_campaign_condition_save( $cond)
 /*
     add OCS campaign condition
 */
-function ocs_admin_campaign_condition_add( $cond)
+function ocs_admin_rule_condition_add( $cond)
 {
     db_set_active('ocsdb');
     //dpm( $cond, 'cond');
@@ -409,43 +409,42 @@ function ocs_admin_campaign_condition_add( $cond)
 }
 
 
-function ocs_admin_campaign_cond_delete_confirm( $form, &$form_state, $campaign_id, $rule_id, $cond_id)
+function ocs_admin_rule_cond_delete_confirm( $form, &$form_state, $rule_id, $cond_id)
 {
 	$cond_name = isset( $_GET['name']) ? strip_tags($_GET['name']) : 'Condition ID:' . $cond_id;
 
-    $form['#campaign_id'] = $campaign_id;
+    $form['#redirect'] = $_GET['redirect'];
     $form['#rule_id'] = $rule_id;
     $form['#cond_id'] = $cond_id;
     $form['#cond_name'] = $cond_name;
     $form['#cond_idx'] = isset( $_GET['idx']) ? $_GET['idx'] : '0';
 
-    $caption = t('<p><strong>Warning:</strong> @name of the Rule @id will be deleted from the Campaign.</p>',
+    $caption = t('<p><strong>Warning:</strong> @name of the Rule @id will be deleted.</p>',
         array( '@id' => $rule_id, '@name' => ($cond_id == 0) ? t('All the conditions') : 
             t( 'The condition "@key"', array( '@key' => $cond_name))));
 
     $caption .= '<p>'. t('This action cannot be undone.') . '</p>';
 
     return confirm_form( $form, t('Are you sure to delete the condition ?'),
-        'ocs_admin/campaign/' . $campaign_id . '/rule',
+        $form['#redirect'],
         $caption, t('Delete'));
 }
 
-function ocs_admin_campaign_cond_delete_confirm_submit( $form, &$form_state)
+function ocs_admin_rule_cond_delete_confirm_submit( $form, &$form_state)
 {
-    $campaign_id = $form['#campaign_id'];
     $cond = array(
         'rule_id' => $form['#rule_id'],
         'cond_id' => $form['#cond_id'],
         'cond_idx' => $form['#cond_idx'],
     );
-    ocs_admin_campaign_condition_delete( $cond);
+    ocs_admin_rule_condition_delete( $cond);
 
     drupal_set_message( t('The condition has been removed from the Campaign.'));
 
-    $form_state['redirect'] = 'ocs_admin/campaign/' . $campaign_id . '/rule';
+    $form_state['redirect'] = $form['#redirect'];
 }
 
-function ocs_admin_campaign_condition_delete( $cond)
+function ocs_admin_rule_condition_delete( $cond)
 {
     db_set_active( 'ocsdb');
     dpm( $cond, 'cond delete');
@@ -468,7 +467,7 @@ function ocs_admin_campaign_condition_delete( $cond)
 }
 
 
-function ocs_admin_campaign_cond_load( $cond_id, $cond_idx)
+function ocs_admin_rule_cond_load( $cond_id, $cond_idx)
 {
     db_set_active( 'ocsdb');
 

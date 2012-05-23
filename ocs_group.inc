@@ -1,6 +1,6 @@
 <?php
 
-require_once( 'ocs_rule.inc');
+require_once( 'ocs_rule_group.inc');
 
 /*
 ** group over view page
@@ -57,6 +57,7 @@ function theme_ocs_admin_group_overview( $variables)
 function ocs_admin_group_edit_form( $form, &$form_state, $type, $groupid = NULL)
 {
     if ( isset( $groupid)) $group = group_load( $groupid);
+    dpm($_GET['account_key'], 'a');
     $form = array();
    
     $form['group'] = array(
@@ -133,15 +134,26 @@ function ocs_admin_group_edit_form( $form, &$form_state, $type, $groupid = NULL)
     dpm( $rules, 'rules');
 
     if ( count( $rules->rules()) == 0) {
-        $form['discount']['rule'] = array(
-            '#type' => 'markup',
-            '#markup' => t('There are no rules yet. <a href="@url">Add Rules.</a>',
-                array( '@url' => url( 'ocs_admin/rule/add', 
-                    array( 'query' => array( 
-                        'redirect' => current_path(),
-                        'name' => $group['group_name'],
-                        'rule_key' => 'group:'.$groupid))))),
-        );
+        // get OCS_VPN_CALL event
+        $items = entity_load( 'node', FALSE, array( 'type' => 'ocs_events', 'title' => 'OCS_VPN_CALL'));
+        $event = array_shift( $items);
+        if ( empty( $event)) {
+            $form['discount']['rule'] = array(
+                '#type' => 'markup',
+                '#markup' => t('Unable to find OCS_VPN_CALL event.'),
+            );
+        }
+        else {
+            $form['discount']['rule'] = array(
+                '#type' => 'markup',
+                '#markup' => t('There are no rules yet. <a href="@url">Add Rules.</a>',
+                    array( '@url' => url( 'ocs_admin/rule/add', 
+                        array( 'query' => array( 
+                            'redirect' => current_path(),
+                            'name' => $group['group_name'],
+                            'rule_key' => 'group:'.$groupid.':event:'.$event->nid))))),
+            );
+        }
     }
     else {
         $form['discount']['rule'] = array(
@@ -166,15 +178,8 @@ function ocs_admin_group_edit_form( $form, &$form_state, $type, $groupid = NULL)
         $form['group']['ancestor_group_id']['#value'] = $group['ancestor_group_id'];
         $form['group']['parent_group_id']['#value'] = $group['parent_group_id'];
         $form['group']['group_name']['#default_value'] = $group['group_name'];
-        $form['group']['master_number']['#default_value'] = $group['master_number'];
+        $form['group']['container']['master_number']['#default_value'] = $group['master_number'];
         $form['group']['limit_usage']['#default_value'] = $group['limit_usage'];
-        /*
-        $form['section']['discount']['from_hour']['#default_value'] = (int)substr($group['from_time'], 0, 2);
-        $form['section']['discount']['from_min']['#default_value'] = (int)substr($group['from_time'], 2, 2);
-        $form['section']['discount']['to_hour']['#default_value'] = (int)substr($group['to_time'], 0, 2);
-        $form['section']['discount']['to_min']['#default_value'] = (int)substr($group['to_time'], 2, 2);
-        $form['section']['discount']['discount_rate']['#default_value'] = $group['discount_rate'];
-        */
         $_SESSION['form_mode'] = 'M';
         $_SESSION['group_name'] = $group['group_name'];
         $_SESSION['limt_usage'] = $group['limit_usage'];
@@ -209,12 +214,12 @@ function ocs_admin_group_edit_form_submit( $form, &$form_state)
 {
     $group = $form_state['values'];
     if ( $form_state['values']['op'] == 'Search Account') {
-        $query = array(
+         $query = array(
             'redirect' => current_path(),
             'ancestor_group_id' => $form_state['values']['ancestor_group_id'],
+            'account_key' => $form_state['values']['master_number'],
         );
-        
-        drupal_goto( 'ocs_admin/account/master/select', array( 'query' => $query));
+        drupal_goto( 'ocs_admin/account/group/master/select', array( 'query' => $query));
     } else if ( $form_state['values']['op'] == 'Save') {
         ocs_admin_group_save($group);
 

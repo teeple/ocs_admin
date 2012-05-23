@@ -396,3 +396,201 @@ function ocs_admin_export_message_submit( $form, &$form_state)
 
     $form_state['redirect'] = 'ocs_admin/config/ocs/message';
 }
+
+
+/*
+    export vpn tariff
+*/
+function ocs_admin_export_vpntariff( $form, &$form_state)
+{
+    $form['desc'] = array(
+        '#type' => 'markup',
+        '#markup' => '<p>Check the Rule file contents that contains the VPN tariff rules.</p>',
+    );
+
+    $form['ocs'] = array(
+        '#type' => 'fieldset',
+        '#title' => 'OCS(Online Charging System) Access Info',
+        '#description' => t('OCS Access Settings. It can be changed ').
+            l( t('here'), '/admin/config/system/ocs_admin'),
+        '#collapsible' => TRUE, 
+        '#collapsed' => FALSE,
+    );
+
+    $ip_address = variable_get('ocs_admin_ip_address', 'Administrative Warning');
+    $user_account = variable_get('ocs_admin_user_account', 'Administrative Warning');
+    $user_password = variable_get('ocs_admin_user_password', 'Administrative Warning');
+    $config_directory = variable_get('ocs_admin_config_directory', 'Administrative Warning');
+    $action_file_name = variable_get('ocs_admin_pps_action_rule_file', 'Administrative Warning');
+    $discount_file_name = variable_get('ocs_admin_vpn_discount_rule_file', 'Administrative Warning');
+
+    $form['ocs']['ip_address_markup'] = array(
+        '#type' => 'item',
+        '#title' => 'IP Address',
+        '#markup' => $ip_address,
+    );
+
+    $form['ocs']['user_account'] = array(
+        '#type' => 'item',
+        '#title' => 'Account Name',
+        '#markup' => $user_account,
+    );
+
+    $form['ocs']['config_directory'] = array(
+        '#type' => 'item',
+        '#title' => 'Configuration Directory',
+        '#markup' => $config_directory,
+    );
+
+    $form['ocs']['pps_action_file'] = array(
+        '#type' => 'item',
+        '#title' => 'PPS Action Rule File Name',
+        '#markup' => $action_file_name,
+    );
+
+    $form['ocs']['discount_rule_file'] = array(
+        '#type' => 'item',
+        '#title' => 'VPN Discount Rule File Name',
+        '#markup' => $discount_file_name,
+    );
+
+    list( $action, $discount) = _vpn_discount_export();
+
+    $form['action_rule'] = array(
+        '#type' => 'textarea',
+        '#title' => 'pps_actions.rule',
+        '#rows' => 10,
+        '#value' => $action,
+    );
+
+    $form['discount_rule'] = array(
+        '#type' => 'textarea',
+        '#title' => 'vpn_discount.rule',
+        '#rows' => 10,
+        '#value' => $discount,
+    );
+
+    $form['actions'] = array('#type' => 'actions');
+
+    $form['actions']['submit'] = array(
+        '#type' => 'submit',
+        '#value' => t('Update Configuration'),
+    );
+
+    $form['actions']['cancel'] = array(
+        '#type' => 'submit',
+        '#value' => t('Cancel'),
+    );
+
+    return $form;
+}
+
+function ocs_admin_export_vpntariff_submit( $form, &$form_state)
+{
+    $values = $form_state['values'];
+
+    if ( $values['op'] == 'Update Configuration') {
+        _update_configuration( $values);
+    }
+
+    $form_state['redirect'] = 'ocs_admin/config/ocs/vpntariff';
+}
+
+
+function _vpn_discount_export()
+{
+    $campaigns = ocs_admin_campaigns_load_all();
+    dpm( $campaigns, 'campaigns');
+    
+    $event_action = '[RULESET_EVENT_ACTIONS]
+service_id , string(30)
+event_name , string(32)
+promotion_service_id , string(30) , result, mandatory
+priority , int , result, mandatory
+promotion_category , string(30), result
+promotion_parameter, string(256) , result, mandatory
+
+[EVENT_ACTIONS]';
+
+    $newline = '
+';
+
+    $bonus_cond = '
+
+[RULESET_ACTIVATION_BONUS_CONDITION]
+!rules
+
+[ACTIVATION_BONUS_CONDITION]
+';
+
+    $bonus_amount = '
+[RULESET_ACTIVATION_BONUS_AMOUNT]
+targetRule , string(32)
+db_action , string(128)
+!rules
+ 
+[ACTIVATION_BONUS_AMOUNT]
+';
+
+    $bonus_factors = array();
+    $amount_factors = array();
+
+    foreach( $campaigns as $campaign) {
+        $campaign_id = $campaign['campaign_id'];
+        $campaign_rules = new OcsCampaignRules;
+        $campaign_rules->load( $campaign_id);
+
+        dpm( $campaign_rules->rules(), 'rules');
+
+        // build event_actions.rule file
+        $events = array();
+        foreach( $campaign_rules->rules() as $rule) {
+            $event_id = $rule->event_id();
+            $event_node = node_load( $event_id);
+
+            dpm( $event_node, 'event node');
+
+            if ( ! in_array( $event_id, $events) ) {
+                $events[] = $event_id;
+
+                $property = json_decode($event_node->field_property['und'][0]['value'], TRUE);
+                if ( !empty( $property)) {
+                    $property_str = '';
+                    foreach( $property as $key => $value) {
+                        $property_str .= $key . '=' . $value . ' ';
+                    }
+                }
+
+                $event_action .= t("
+    @id: @property event_name=@event, promotion_service_id = giving_bonus , priority = 10 , promotion_parameter = 't_bonus_condition=activation_bonus_condition&t_bonus_amount=activation_bonus_amount'", 
+                    array( '@id' => $campaign_id, '@event' => $event_node->title,
+                        '@property' => isset( $property) ? $property_str.',' : ''));
+
+            }
+
+            // build activation_bonus.rule file
+            $script = $rule->get_rule_script();
+            dpm( $script, 'rule script');
+
+            $bonus_cond .= $script['conditions']['rules'];
+            $bonus_factors = array_merge( $bonus_factors, $script['conditions']['factors']);
+
+            $bonus_amount .= $script['actions']['rules'];
+            $amount_factors = array_merge( $amount_factors, $script['actions']['factors']);
+        }
+    }
+
+    $rule_str = '';
+    foreach( $bonus_factors as $key => $property) {
+        $rule_str .= $key . ', ' . $property . $newline;
+    }
+    $bonus_cond = t( $bonus_cond, array('!rules' => $rule_str));
+
+    $rule_str = '';
+    foreach( $amount_factors as $key => $property) {
+        $rule_str .= $key . ', ' . $property . $newline;
+    }
+    $bonus_amount = t( $bonus_amount, array('!rules' => $rule_str));
+
+    return array( $event_action, $bonus_cond. $bonus_amount);
+}

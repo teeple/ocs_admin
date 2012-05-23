@@ -1,11 +1,11 @@
 <?php
 
-module_load_include( 'inc', 'ocs_admin', 'ocs_campaign_action');
-module_load_include( 'inc', 'ocs_admin', 'ocs_campaign_event');
-module_load_include( 'inc', 'ocs_admin', 'ocs_campaign_cond');
-module_load_include( 'inc', 'ocs_admin', 'ocs_campaign_export');
+require_once( 'ocs_campaign_action.inc');
+require_once( 'ocs_campaign_event.inc');
+require_once( 'ocs_campaign_cond.inc');
+require_once( 'ocs_campaign_export.inc');
 
-require_once( 'ocs_rule.inc');
+require_once( 'ocs_rule_campaign.inc');
 
 /*
 ** campaign rules form
@@ -22,7 +22,7 @@ function ocs_admin_campaign_rule_form( $form, &$form_state, $campaign_id = NULL)
   // get all events
   //****************************
 
-    $campaign = new OcsCampaign;
+    $campaign = new OcsCampaignRules;
     $campaign->load( $campaign_id);
 
 	foreach( $campaign->rules() as $rule_id => $rule) {
@@ -83,8 +83,8 @@ function ocs_admin_campaign_rule_form( $form, &$form_state, $campaign_id = NULL)
 
 	$form['#caption'] = '<h3>Events</h3>';
 	$form['#empty_text'] = t('There are no events yet. <a href="@url">Add Event.</a>',
-        array( '@url' => url( t('ocs_admin/campaign/@campaign/event/add', 
-                                array( '@campaign' => $campaign_id)))));
+        array( '@url' => url( t('ocs_admin/campaign/@campaign/event/add', array( '@campaign' => $campaign_id)), 
+            array( 'query' => array('redirect' => current_path())))));
 	$form['#no_rule'] = t('There are no rules yet. ');
 
     return $form;
@@ -134,8 +134,7 @@ function ocs_admin_campaign_rule_theme( $form)
             // list conditions and actions of each rule
             foreach( $form['#event'][$event_id]['rule'] as $rule) {
 
-                $rows = array_merge( $rows, $rule->table_rows( array( 'query' => 
-                    array( 'event_name' => $element['#event_name']))));
+                $rows = array_merge( $rows, $rule->table_rows());
             }
         }
     }
