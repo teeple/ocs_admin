@@ -460,6 +460,7 @@ function ocs_admin_table_account_key_view()
 
 function ocs_admin_table_group()
 {
+    $_SESSION['subgroup_id'] = NULL;
     // Customer Group table
     $data['ocs_group']['table']['name'] = 'ocsdata.ocs_group';
     $data['ocs_group']['table']['group'] = t('OCS Customer Group');
