@@ -361,24 +361,25 @@ function ocs_admin_campaign_save( $campaign)
 */
 function ocs_admin_campaign_delete_form( $form, &$form_state, $campaign_id)
 {
-	$campaign = ocs_admin_campaign_load( $campaign_id);
+    $form['#campaign_name'] = $_GET['name'];
+    $form['#campaign_id'] = $campaign_id;
 
-    $form['#campaign'] = $campaign;
+    $caption = '<p>'. 
+            t('<strong>Warning:</strong> The Campaign "@name" will be deleted.',
+                array( '@name' => $form['#campaign_name'])) .
+        '</p>';
 
-    $caption = '<p>'. t('This action cannot be undone...') . '</p>';
-
-    return confirm_form( $form, t('Are you sure to delete the campaign "@name"?', 
-				array( '@name' => $campaign['campaign_name'])),
+    return confirm_form( $form, t('Are you sure to delete the campaign ?'), 
 			'ocs_admin/campaign/list', $caption, t('Delete'));
 }
 
 function ocs_admin_campaign_delete_form_submit( $form, &$form_state)
 {
-    $campaign = $form['#campaign'];
+    $campaign_id = $form['#campaign_id'];
 
-	ocs_admin_campaign_delete( $campaign['campaign_id']);
+	ocs_admin_campaign_delete( $campaign_id);
 
-    $t_args = array( '%name' => $campaign['campaign_name']);
+    $t_args = array( '%name' => $form['#campaign_name']);
     drupal_set_message( t('The campaign %name has been deleted.', $t_args));
     watchdog( 'ocs_admin', 'Deleted campaign %name.', $t_args, WATCHDOG_NOTICE);
 

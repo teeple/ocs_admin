@@ -56,6 +56,10 @@ function theme_ocs_admin_group_overview( $variables)
 
 function ocs_admin_group_edit_form( $form, &$form_state, $type, $groupid = NULL)
 {
+    if ((isset($_SESSION['subgroup_id'])) && (!is_null($_SESSION['subgroup_id']))) {
+        $groupid = $_SESSION['subgroup_id'];
+        $_SESSION['subgroup_id'] = NULL;
+    } 
     if ( isset( $groupid)) $group = group_load( $groupid);
     $form = array();
    
@@ -71,24 +75,55 @@ function ocs_admin_group_edit_form( $form, &$form_state, $type, $groupid = NULL)
         '#type' => 'hidden',
         '#value' => NULL,
     );
+    if ((isset($group)) && ($group['parent_group_id'] != 0)) {
+        $_SESSION['subgroup_id'] = $groupid;
+        $subgroups = ocs_admin_subgroup_load($groupid);
+        $options = array();
+        foreach($subgroups as $key => $value) {
+            $options[$key] = $value['group_name'];
+            if ($value['parent_group_id'] == 0) {
+                $ancestor = $value['ancestor_group_id'];
+            }
+        }
+        
+        $form['group']['parent_group_id'] = array(
+            '#type' => 'select',
+            '#title' => 'Parent Group',
+            '#options' => $options,
+        );
+        
+        $form['group']['ancestor_group_id'] = array(
+            '#type' => 'hidden',
+            '#value' => $ancestor,
+        );
 
-    $form['group']['parent_group_id'] = array(
-        '#type' => 'hidden',
-        '#value' => 0,
-    );
+        $form['group']['group_name'] = array(
+            '#type' => 'textfield',
+            '#title' => 'Name',
+            '#description' => t('Enter Subgroup Name'),
+            '#maxlength' => 64,
+            '#size' => 30,
+        );
+    } else {
+        $_SESSION['subgroup_id'] = NULL;
+        $form['group']['parent_group_id'] = array(
+            '#type' => 'hidden',
+            '#value' => 0,
+        );
 
-    $form['group']['ancestor_group_id'] = array(
-        '#type' => 'hidden',
-        '#value' => 0,
-    );
+        $form['group']['ancestor_group_id'] = array(
+            '#type' => 'hidden',
+            '#value' => 0,
+        );
 
-    $form['group']['group_name'] = array(
-        '#type' => 'textfield',
-        '#title' => 'Name',
-        '#description' => t('Enter Group Name'),
-        '#maxlength' => 64,
-        '#size' => 30,
-    );
+        $form['group']['group_name'] = array(
+            '#type' => 'textfield',
+            '#title' => 'Name',
+            '#description' => t('Enter Group Name'),
+            '#maxlength' => 64,
+            '#size' => 30,
+        );
+    }
 
     $form['group']['limit_usage'] = array(
         '#type' => 'textfield',
@@ -343,7 +378,6 @@ function ocs_admin_group_form( $form, &$form_state, $groupid)
 
     // get all subgroups
     $subgroups = ocs_admin_subgroup_load( $group['group_id']);
-    dpm( $subgroups, 'subgroups');
 
     list( $root, $tree) = ocs_admin_build_tree( $subgroups, array( 
         'title' => 'group_name',
@@ -755,7 +789,7 @@ function ocs_admin_group_delete_confirm( $form, &$form_state, $group)
     else{
         // delete subgroup
         $num_members = ocs_admin_group_members_count( $group['group_id'], 'group_id');
-        $redirect = 'ocs_admin/group/' . $group['ancestor_group_id'];
+        $redirect = 'ocs_admin/group/' . $group['ancestor_group_id'].'/subgroup';
         $msg = t('Are you sure to delete the subgroup "%name"?', array( '%name' => $group['group_name']));
     }
 
@@ -981,6 +1015,7 @@ function ocs_admin_member_edit_form( $form, &$form_state, $group, $account_key)
 function ocs_admin_member_edit_form_submit( $form, &$form_state)
 {
     $member = $form_state['values'];
+    
     if ( $form_state['values']['op'] == 'Save') {
         ocs_admin_member_save( $member);
         drupal_set_message( t('The information has been updated.'));
@@ -1107,7 +1142,6 @@ function ocs_admin_group_delete( $group)
 function ocs_admin_subgroup_delete( $group)
 {
     db_set_active( 'ocsdb');
-dpm($group, 'groupdelete');
     // delete
     $status = db_delete( 'ocs_group')
         ->condition( 'group_id', $group['group_id'])
@@ -1139,16 +1173,15 @@ function ocs_admin_member_save( $member)
         if ( isset( $member[$field]))
             $fields[ $field] = $member[ $field];
     }
-
-     // insert
-     $status = db_merge( 'ocs_group_member')
+    
+    // insert
+    $status = db_merge( 'ocs_group_member')
         ->key( array( 'account_key' => $member['account_key']))
         ->fields( $fields)
         ->execute();
-    
+
     db_set_active( 'default');
 }
-
 /*
     find ancestor group id info
 */
@@ -1289,8 +1322,6 @@ if (substr($groupid, 0, 1) == 'A'){
     );
 
     foreach( $members as $key => $member) {
-//        dpm( $member, 'member');
-
         $sub = &$form['#subgroup'][ $member['group_id']];
         $sub['members'][] = $key;
 
@@ -1336,13 +1367,14 @@ if (substr($groupid, 0, 1) == 'A'){
 
         $form['members'][$key]['#attributes'] = array( 'class' => array('menu-enabled'));
 
-      // Build a list of operations
-      $operations = array();
-      $operations['remove'] = array( 
-        '#type' => 'link',
-        '#title' => t('remove'),
-        '#href' => 'ocs_admin/group/'. $groupid . '/member/' . $member['account_key'] . '/delete');
-      $form['members'][$key]['operations'] = $operations;  
+
+        // Build a list of operations
+        $operations = array();
+        $operations['remove'] = array( 
+            '#type' => 'link',
+            '#title' => t('remove'),
+            '#href' => 'ocs_admin/group/'. $groupid . '/member/' . $member['account_key'] . '/delete');
+        $form['members'][$key]['operations'] = $operations;  
     }
 
     $form['actions'] = array(
@@ -1351,7 +1383,7 @@ if (substr($groupid, 0, 1) == 'A'){
 
     $form['actions']['submit'] = array(
         '#type' => 'submit',
-        '#value' => t('Save Configuration'),
+        '#value' => t('Save'),
     );
     $form['actions']['cancel'] = array(
         '#type' => 'submit',
@@ -1483,7 +1515,6 @@ function ocs_admin_member_list_submit( $form, &$form_state)
             $list = explode( ':', $key);
             if ( isset( $form['members'][$list[0]]) && 
                  (!isset( $form['members'][$list[0]][$key]['#default_value']) || 
-//                 $list[1] == 'group_id' ||
                  $form['members'][$list[0] ][$key]['#default_value'] != $value)) {
                 $updated[$list[0]][$list[1]] = $value;
             }
@@ -1497,6 +1528,7 @@ function ocs_admin_member_list_submit( $form, &$form_state)
   //              }
             }
         }
+        drupal_set_message(t('The members information has been saved.'));
     }
 }
 
@@ -1797,24 +1829,7 @@ function ocs_admin_subgroup_add_page_wizard( $form, &$form_state, $group_id, $ar
         '#required' => TRUE,
     );
 
-    $form['section']['subgroup']['master_number'] = array(
-        '#type' => 'textfield',
-        '#title' => 'Master Number',
-        '#description' => t('Enter or select a master number to be used'),
-        '#maxlength' => 24,
-        '#size' => 30,
-    );
-
-    $form['section']['discount'] = array(
-        '#type' => 'fieldset',
-        '#title' => t('Discout Information'),
-        '#collapsible' => TRUE,
-        '#collapsed' => FALSE,
-        '#default_value' => 0,
-        '#attributes' => array( 'class' => array( 'column')),
-    );
-
-    $form['section']['discount']['limit_usage'] = array(
+    $form['section']['subgroup']['limit_usage'] = array(
         '#type' => 'textfield',
         '#title' => 'Limit Usage',
         '#description' => t('Enter group limit usage'),
@@ -1823,6 +1838,14 @@ function ocs_admin_subgroup_add_page_wizard( $form, &$form_state, $group_id, $ar
         '#default_value' => 0,
     );
  
+    $form['section']['subgroup']['master_number'] = array(
+        '#type' => 'textfield',
+        '#title' => 'Master Number',
+        '#description' => t('Enter or select a master number to be used'),
+        '#maxlength' => 24,
+        '#size' => 30,
+    );
+
     $form['section']['subgroup']['account_search'] = array(
         '#type' => 'submit',
         '#value' => 'Search Account',

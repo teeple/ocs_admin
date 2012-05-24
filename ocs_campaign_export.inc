@@ -1,6 +1,7 @@
 <?php
 
 require_once( 'ocs_rule_campaign.inc');
+require_once( 'ocs_common.inc');
 
 function ocs_admin_campaign_export( $form, &$form_state)
 {
@@ -49,10 +50,20 @@ function ocs_admin_campaign_export( $form, &$form_state)
         '#markup' => $action_file_name,
     );
 
+    $form['action_rule_file_name'] = array(
+        '#type' => 'hidden',
+        '#value' => $action_file_name,
+    );
+
     $form['ocs']['bonus_rule_file'] = array(
         '#type' => 'item',
         '#title' => 'Activation Bonus Rule File Name',
         '#markup' => $bonus_file_name,
+    );
+
+    $form['bonus_rule_file_name'] = array(
+        '#type' => 'hidden',
+        '#value' => $bonus_file_name,
     );
 
     list( $action, $bonus) = _campaign_export();
@@ -91,38 +102,8 @@ function ocs_admin_campaign_export_submit( $form, &$form_state)
     $values = $form_state['values'];
 
     if ( $values['op'] != 'Cancel') {
-
-        // write to file
-        try{
-            $ip_address = variable_get('ocs_admin_ip_address', 'Administrative Warning');
-            $user = variable_get('ocs_admin_user_account', 'Administrative Warning');
-            $passwd = variable_get('ocs_admin_user_password', 'Administrative Warning');
-            $dir = variable_get('ocs_admin_config_directory', 'Administrative Warning');
-
-            $files = array(
-                array(
-                    'fname' => variable_get('ocs_admin_ocs_event_action_rule_file', 'Administrative Warning'),
-                    'value' => $values['action_rule'],
-                    ),
-                array(
-                    'fname' => variable_get('ocs_admin_ocs_activation_bonus_file', 'Administrative Warning'),
-                    'value' => $values['bonus_rule'],
-                    ));
-
-            foreach( $files as $file) {
-                $fd = fopen( '/tmp/'. $file['fname'], 'w');
-                fwrite( $fd, $file['value']);
-                fclose( $fd);
-
-                // ftp to host
-                if ( ocs_admin_ftp_put( $ip_address, $user, $passwd, $dir, $file['fname'])) {
-                    drupal_set_message( t('Rule file "@name" is updated in the OCS', array( '@name' => $file['fname'])));
-                }
-            }
-        }
-        catch( Exception $e) {
-            drupal_set_message( $e->getMessage(), 'warning');       
-        }
+        ocs_admin_update_configuration( $values['action_rule_file_name'], $values['action_rule']);
+        ocs_admin_update_configuration( $values['bonus_rule_file_name'], $values['bonus_rule']);
     }
 
     $form_state['redirect'] = 'ocs_admin/campaign/';
@@ -154,6 +135,7 @@ promotion_parameter, string(256) , result, mandatory
 ';
 
     $bonus_amount = '
+
 [RULESET_ACTIVATION_BONUS_AMOUNT]
 targetRule , string(32)
 db_action , string(128)

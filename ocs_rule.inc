@@ -1,7 +1,7 @@
 <?php
 
 class OcsRule {
-    private $rule;
+    var $rule;
     private $conditions;
     private $actions;
 
@@ -78,6 +78,13 @@ class OcsRule {
     {
         $list = explode( ':', $this->rule->rule_key);
         if ( count( $list) == 4 && $list[0] == 'campaign') return $list[1];
+        return NULL;
+    }
+
+    function group_id()
+    {
+        $list = explode( ':', $this->rule->rule_key);
+        if ( $list[0] == 'group') return $list[1];
         return NULL;
     }
 
@@ -393,7 +400,7 @@ class OcsRule {
     }
 
 
-    function get_rule_script( $target_action)
+    function get_rule_script( $target_action, $optional_rule = NULL)
     {
         $newline = '
 ';
@@ -406,6 +413,7 @@ class OcsRule {
         $rule_name = str_replace( ' ', '_', $this->rule->rule_name);
         if ( ! empty( $this->conditions)) {
             foreach( $this->conditions as $conds) {
+                // build condition script
                 $cond_rules .= $newline . $rule_name . ' : ';
 
                 $i =0;
@@ -419,6 +427,9 @@ class OcsRule {
                         $cond_factors[ $factor] = _get_rule_property( $cond->param_id, $factor);
                     }
                 }
+
+                // add optional rules such as 'vpn_group_id=10'
+                if ( isset( $optional_rule)) $cond_rules .= ', ' . $optional_rule;
             }
         }
 

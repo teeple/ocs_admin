@@ -116,11 +116,14 @@ function ocs_admin_rule_add_cond_form( $form, &$form_state, $rule_id, $cond_id, 
         );
     }
 
+    $op_options = drupal_map_assoc( $params->operators( $selected_param));
+    if ( ! in_array( $operator, array_keys( $op_options)))  // adjust operator value
+        $operator = array_shift( array_keys( $op_options));
     $form['container']['param']['operator'] = array(
         '#type' => 'select',
         '#title' => 'Operator',
-        '#options' => drupal_map_assoc( $params->operators( $selected_param)),
-        '#default_value' => isset($condition) ? $condition['operator'] : NULL,
+        '#options' => $op_options,
+        '#default_value' => $operator,
         '#ajax' => array(
             'callback' => 'ocs_admin_ajax_value_type',
             'wrapper' => 'replace_value_div',
@@ -343,33 +346,6 @@ function _get_param_name( $params, $values)
 }
 
 
-/*
-function _get_param_value( $paramlist, $param, $value)
-{
-    $type = _get_param_type( $paramlist, $param);
-    if ( $type == OCS_PARAM_TYPE_ENUM) {
-        $enum_list = array_flip( $paramlist[$param.':enum']);
-
-        $selected = array();
-        if ( is_array( $value)) {
-            foreach( $value as $key => $item) {
-                if ( ! empty($item) ) {  // it's selected
-                    $selected[$enum_list[$key]] = $key;
-                }
-            }
-        }
-        else {
-            if ( ! isset( $enum_list[$value])) return NULL;
-            $selected = array( $enum_list[$value] => $value);
-        }
-
-        // return json encoded string
-        return array( json_encode( $selected), '('.implode( ', ', array_values( $selected)). ')');
-    }
-
-    return array( $value, $value);
-}
-*/
 
 /*
     save OCS campaign condition

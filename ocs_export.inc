@@ -1,6 +1,7 @@
 <?php
 
 require_once( 'ocs_rule_group.inc');
+require_once( 'ocs_common.inc');
 
 /*
     state transition rule form
@@ -114,34 +115,10 @@ function ocs_admin_export_state_transition_submit( $form, &$form_state)
     $values = $form_state['values'];
 
     if ( $values['op'] != 'Cancel') {
-        _update_configuration( $values['file_name'], $values['file_content']);
+        ocs_admin_update_configuration( $values['file_name'], $values['file_content']);
     }
 
     $form_state['redirect'] = 'ocs_admin/config/ocs/state/transition';
-}
-
-function _update_configuration( $file_name, $content)
-{
-    // write to file
-    try{
-        $fd = fopen( '/tmp/'. $file_name, 'w');
-        fwrite( $fd, $content);
-        fclose( $fd);
-
-        $ip_address = variable_get('ocs_admin_ip_address', 'Administrative Warning');
-        $user = variable_get('ocs_admin_user_account', 'Administrative Warning');
-        $passwd = variable_get('ocs_admin_user_password', 'Administrative Warning');
-        $dir = variable_get('ocs_admin_config_directory', 'Administrative Warning');
-
-        // ftp to host
-        if ( ocs_admin_ftp_put( $ip_address, $user, $passwd, $dir, $file_name)) {
-            drupal_set_message( t('Configuration file "@name" is uploaded to the OCS',
-                array( '@name' => $file_name)));
-        }
-    }
-    catch( Exception $e) {
-        drupal_set_message( $e->getMessage(), 'warning');       
-    }
 }
 
 /*
@@ -263,7 +240,7 @@ function ocs_admin_export_state_svc_perm_submit( $form, &$form_state)
     $values = $form_state['values'];
 
     if ( $values['op'] != 'Cancel') {
-        _update_configuration( $values['file_name'], $values['file_content']);
+        ocs_admin_update_configuration( $values['file_name'], $values['file_content']);
     }
 
     $form_state['redirect'] = 'ocs_admin/config/ocs/svcperm';
@@ -390,7 +367,7 @@ function ocs_admin_export_message_submit( $form, &$form_state)
     $values = $form_state['values'];
 
     if ( $values['op'] != 'Cancel') {
-        _update_configuration( $values['file_name'], $values['file_content']);
+        ocs_admin_update_configuration( $values['file_name'], $values['file_content']);
     }
 
     $form_state['redirect'] = 'ocs_admin/config/ocs/message';
@@ -499,8 +476,8 @@ function ocs_admin_export_vpntariff_submit( $form, &$form_state)
     $values = $form_state['values'];
 
     if ( $values['op'] != 'Cancel') {
-        _update_configuration( $values['pps_action_file_name'], $values['action_rule']);
-        _update_configuration( $values['discount_rule_file_name'], $values['discount_rule']);
+        ocs_admin_update_configuration( $values['pps_action_file_name'], $values['action_rule']);
+        ocs_admin_update_configuration( $values['discount_rule_file_name'], $values['discount_rule']);
     }
 
     $form_state['redirect'] = 'ocs_admin/config/ocs/vpntariff';
@@ -528,14 +505,18 @@ promotion_parameter, string(256) , result, mandatory
 ';
 
     $discount_cond = '
-[RULESET_VPN_DISCOUNT]
+[RULESET_VPN_DISCOUNT_CONDITION]
+vpn_group_id, string(10)
 !rules
   
-[VPN_DISCOUNT]
+[VPN_DISCOUNT_CONDITION]
 ';
 
     $discount_rate = '
+
 [RULESET_VPN_DISCOUNT_RATE]
+targetRule , string(32)
+db_action , string(128)
 !rules
 
 [VPN_DISCOUNT_RATE]
@@ -578,7 +559,7 @@ promotion_parameter, string(256) , result, mandatory
         }
 
         // build activation_bonus.rule file
-        $script = $rule->get_rule_script( $action_apply_discount);
+        $script = $rule->get_rule_script( $action_apply_discount, 'vpn_group_id=' . $rule->group_id());
 
         $discount_cond .= $script['conditions']['rules'];
         $cond_factors = array_merge( $cond_factors, $script['conditions']['factors']);

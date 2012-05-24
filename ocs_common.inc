@@ -181,4 +181,28 @@ function ocs_admin_ftp_put( $ip_address, $user, $passwd, $dir, $file)
     return TRUE;
 }
 
+function ocs_admin_update_configuration( $file_name, $content)
+{
+    // write to file
+    try{
+        $fd = fopen( '/tmp/'. $file_name, 'w');
+        fwrite( $fd, $content);
+        fclose( $fd);
+
+        $ip_address = variable_get('ocs_admin_ip_address', 'Administrative Warning');
+        $user = variable_get('ocs_admin_user_account', 'Administrative Warning');
+        $passwd = variable_get('ocs_admin_user_password', 'Administrative Warning');
+        $dir = variable_get('ocs_admin_config_directory', 'Administrative Warning');
+
+        // ftp to host
+        if ( ocs_admin_ftp_put( $ip_address, $user, $passwd, $dir, $file_name)) {
+            drupal_set_message( t('Configuration file "@name" is uploaded to the OCS',
+                array( '@name' => $file_name)));
+        }
+    }
+    catch( Exception $e) {
+        drupal_set_message( $e->getMessage(), 'warning');       
+    }
+}
+
 

@@ -29,7 +29,7 @@ class OcsParam
             '=', '>', '>=', '<', '<=', 'between',
             ),
         OCS_PARAM_TYPE_TIME => array(
-            '=', '>', '>=', '<', '<=', 'between',
+            'between',
             ),
         OCS_PARAM_TYPE_PRODUCT_KEY => array(
             '=', 
